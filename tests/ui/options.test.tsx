@@ -114,4 +114,39 @@ describe("Options", () => {
     expect(window.confirm).not.toHaveBeenCalled();
     expect(browserMock.storage.local.set).not.toHaveBeenCalled();
   });
+
+  it("persists input, selection, language-rule, and global CSS settings", async () => {
+    render(<Options />);
+    await screen.findByRole("heading", { name: "基本", level: 2 });
+
+    fireEvent.click(screen.getByRole("tab", { name: "输入框 / 划词 / 悬停" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "中英自动目标语言" }));
+    fireEvent.change(screen.getByLabelText("划词触发方式"), {
+      target: { value: "direct" },
+    });
+    await waitFor(() => {
+      expect(
+        (stored as unknown as { input: { autoTargetLanguage: boolean } }).input
+          .autoTargetLanguage,
+      ).toBe(true);
+      expect(
+        (stored as unknown as { selection: { triggerMode: string } }).selection
+          .triggerMode,
+      ).toBe("direct");
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "站点规则" }));
+    fireEvent.input(screen.getByLabelText("总是翻译语言"), {
+      target: { value: "en, ja" },
+    });
+    fireEvent.input(screen.getByLabelText("全局 CSS"), {
+      target: { value: ".imt-target { color: red; }" },
+    });
+    await waitFor(() => {
+      expect(stored.alwaysTranslateLangs).toEqual(["en", "ja"]);
+      expect((stored as unknown as { globalCss: string }).globalCss).toContain(
+        "red",
+      );
+    });
+  });
 });

@@ -5,23 +5,33 @@ import { builtinRules } from "../../background/rules/builtin-rules";
 import { LANGUAGE_CODES } from "../../shared/lang";
 import { sendToBackground } from "../../shared/messages";
 import type {
-  Config,
-  ConfigPatch,
   JsonValue,
   LangCode,
   Rule,
   ServiceConfig,
   TranslationMode,
 } from "../../shared/types";
+import type { KConfig } from "../../shared/k-types";
 import { Button, Card, Field, Select, Toggle } from "../shared/components";
 import { parseConfigImport, serializeConfig } from "../shared/config-transfer";
-import { languageName, serviceName, t, type I18nKey } from "../shared/i18n";
+import {
+  languageName,
+  serviceName,
+  setUiLocaleOverride,
+  t,
+  type I18nKey,
+} from "../shared/i18n";
+import { useKConfig, type KConfigUpdater } from "../shared/k-config";
 import {
   clearCache,
   getCacheCount,
   testServiceConnection,
 } from "../shared/runtime";
-import { useConfig } from "../shared/use-config";
+import {
+  serviceFields,
+  type ServiceFieldDescriptor,
+} from "../shared/service-fields";
+import { ExpandedFeatureCards, LanguageRuleCards } from "./expanded-panels";
 import "../shared/styles.css";
 import "./options.css";
 
@@ -33,10 +43,6 @@ type TabId =
   | "glossary"
   | "shortcuts"
   | "data";
-
-type ConfigUpdater = (
-  patch: ConfigPatch | ((config: Config) => ConfigPatch),
-) => Promise<Config>;
 
 const tabs: readonly { id: TabId; label: I18nKey }[] = [
   { id: "basic", label: "tab.basic" },
@@ -50,7 +56,7 @@ const tabs: readonly { id: TabId; label: I18nKey }[] = [
 
 export function Options(): preact.JSX.Element {
   const [activeTab, setActiveTab] = useState<TabId>("basic");
-  const { config, error, updateConfig } = useConfig();
+  const { config, error, updateConfig } = useKConfig();
 
   if (!config) {
     return (
@@ -61,6 +67,8 @@ export function Options(): preact.JSX.Element {
       </main>
     );
   }
+
+  setUiLocaleOverride(config.uiLanguage);
 
   return (
     <main class="options-shell">
@@ -122,8 +130,8 @@ export function Options(): preact.JSX.Element {
 }
 
 interface PanelProps {
-  config: Config;
-  onPatch: ConfigUpdater;
+  config: KConfig;
+  onPatch: KConfigUpdater;
 }
 
 function BasicPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
@@ -147,6 +155,24 @@ function BasicPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
     <div class="options-stack">
       <Card title={t("basic.language")}>
         <div class="form-grid two-columns">
+          <Field label={t("basic.uiLanguage")} htmlFor="ui-language">
+            <Select
+              id="ui-language"
+              value={config.uiLanguage}
+              options={[
+                { value: "auto", label: t("common.auto") },
+                { value: "zh-CN", label: "简体中文" },
+                { value: "zh-TW", label: "繁體中文" },
+                { value: "ja", label: "日本語" },
+                { value: "en", label: "English" },
+              ]}
+              onChange={(uiLanguage) =>
+                save(onPatch, {
+                  uiLanguage: uiLanguage as KConfig["uiLanguage"],
+                })
+              }
+            />
+          </Field>
           <Field label={t("basic.targetLanguage")} htmlFor="target-language">
             <Select
               id="target-language"
@@ -283,7 +309,7 @@ interface ServiceCardProps {
   serviceId: string;
   service: ServiceConfig;
   serviceIds: readonly string[];
-  onPatch: ConfigUpdater;
+  onPatch: KConfigUpdater;
 }
 
 function ServiceCard({
@@ -346,103 +372,21 @@ function ServiceCard({
       }
     >
       <div class="form-grid two-columns service-fields">
-        <Field label={t("services.apiKey")} htmlFor={`${serviceId}-api-key`}>
-          <div class="password-field">
-            <input
-              id={`${serviceId}-api-key`}
-              type={showKey ? "text" : "password"}
-              value={service.apiKey || ""}
-              onInput={(event) =>
-                updateService({
-                  apiKey: event.currentTarget.value || undefined,
-                })
-              }
-            />
-            <button type="button" onClick={() => setShowKey((value) => !value)}>
-              {t(showKey ? "common.hide" : "common.show")}
-            </button>
-          </div>
-        </Field>
-        <Field label={t("services.baseUrl")} htmlFor={`${serviceId}-url`}>
-          <input
-            id={`${serviceId}-url`}
-            type="url"
-            value={service.baseUrl || ""}
-            onInput={(event) =>
-              updateService({ baseUrl: event.currentTarget.value || undefined })
+        {serviceFields(serviceId).map((field) => (
+          <ServiceField
+            key={field.key}
+            descriptor={field}
+            serviceId={serviceId}
+            service={service}
+            serviceIds={serviceIds}
+            showKey={showKey}
+            onToggleKey={() => setShowKey((value) => !value)}
+            onChange={(value) =>
+              updateService(serviceFieldPatch(service, field.key, value))
             }
           />
-        </Field>
-        <Field label={t("services.model")} htmlFor={`${serviceId}-model`}>
-          <input
-            id={`${serviceId}-model`}
-            type="text"
-            value={service.model || ""}
-            onInput={(event) =>
-              updateService({ model: event.currentTarget.value || undefined })
-            }
-          />
-        </Field>
-        <Field label={t("services.fallback")} htmlFor={`${serviceId}-fallback`}>
-          <Select
-            id={`${serviceId}-fallback`}
-            value={service.fallbackService || ""}
-            options={[
-              { value: "", label: t("common.none") },
-              ...serviceIds
-                .filter((id) => id !== serviceId)
-                .map((id) => ({ value: id, label: serviceName(id) })),
-            ]}
-            onChange={(fallbackService) =>
-              updateService({ fallbackService: fallbackService || undefined })
-            }
-          />
-        </Field>
-        <Field
-          label={t("services.concurrency")}
-          htmlFor={`${serviceId}-concurrency`}
-        >
-          <input
-            id={`${serviceId}-concurrency`}
-            type="number"
-            min="1"
-            value={service.rateLimit?.concurrency ?? ""}
-            onInput={(event) =>
-              updateService({
-                rateLimit: {
-                  ...service.rateLimit,
-                  concurrency: positiveInteger(event.currentTarget.value),
-                },
-              })
-            }
-          />
-        </Field>
-        <Field
-          label={t("services.batchSize")}
-          htmlFor={`${serviceId}-batch-size`}
-        >
-          <input
-            id={`${serviceId}-batch-size`}
-            type="number"
-            min="1"
-            value={service.maxBatchSize ?? ""}
-            onInput={(event) =>
-              updateService({
-                maxBatchSize: positiveInteger(event.currentTarget.value),
-              })
-            }
-          />
-        </Field>
+        ))}
       </div>
-      <Field label={t("services.prompt")} htmlFor={`${serviceId}-prompt`}>
-        <textarea
-          id={`${serviceId}-prompt`}
-          value={service.prompt || ""}
-          onInput={(event) =>
-            updateService({ prompt: event.currentTarget.value || undefined })
-          }
-        />
-      </Field>
       <div class="service-test-row">
         <Button disabled={testing} onClick={() => void runTest()}>
           {t(testing ? "services.testing" : "services.test")}
@@ -460,6 +404,139 @@ function ServiceCard({
       </div>
     </Card>
   );
+}
+
+function ServiceField({
+  descriptor,
+  serviceId,
+  service,
+  serviceIds,
+  showKey,
+  onToggleKey,
+  onChange,
+}: {
+  descriptor: ServiceFieldDescriptor;
+  serviceId: string;
+  service: ServiceConfig;
+  serviceIds: readonly string[];
+  showKey: boolean;
+  onToggleKey: () => void;
+  onChange: (value: string) => void;
+}): preact.JSX.Element {
+  const id = `${serviceId}-${descriptor.key.replace(".", "-")}`;
+  const value = serviceFieldValue(service, descriptor.key);
+  const label = t(`services.${descriptor.label}` as I18nKey);
+  if (descriptor.control === "select") {
+    return (
+      <Field label={label} htmlFor={id}>
+        <Select
+          id={id}
+          value={value}
+          options={[
+            { value: "", label: t("common.none") },
+            ...serviceIds
+              .filter((candidate) => candidate !== serviceId)
+              .map((candidate) => ({
+                value: candidate,
+                label: serviceName(candidate),
+              })),
+          ]}
+          onChange={onChange}
+        />
+      </Field>
+    );
+  }
+  if (descriptor.control === "textarea") {
+    return (
+      <Field label={label} htmlFor={id}>
+        <textarea
+          id={id}
+          value={value}
+          onInput={(event) => onChange(event.currentTarget.value)}
+        />
+      </Field>
+    );
+  }
+  const input = (
+    <input
+      id={id}
+      type={
+        descriptor.control === "password" && showKey
+          ? "text"
+          : descriptor.control
+      }
+      min={descriptor.min}
+      step={descriptor.step}
+      placeholder={descriptor.placeholder}
+      value={value}
+      onInput={(event) => onChange(event.currentTarget.value)}
+    />
+  );
+  return (
+    <Field label={label} htmlFor={id}>
+      {descriptor.control === "password" ? (
+        <div class="password-field">
+          {input}
+          <button type="button" onClick={onToggleKey}>
+            {t(showKey ? "common.hide" : "common.show")}
+          </button>
+        </div>
+      ) : (
+        input
+      )}
+    </Field>
+  );
+}
+
+function serviceFieldValue(
+  service: ServiceConfig,
+  key: ServiceFieldDescriptor["key"],
+): string {
+  if (key === "rateLimit.rps") return String(service.rateLimit?.rps ?? "");
+  if (key === "rateLimit.concurrency") {
+    return String(service.rateLimit?.concurrency ?? "");
+  }
+  const value = service[key];
+  if (key === "headers") return value ? JSON.stringify(value, null, 2) : "";
+  return value === undefined ? "" : String(value);
+}
+
+function serviceFieldPatch(
+  service: ServiceConfig,
+  key: ServiceFieldDescriptor["key"],
+  value: string,
+): Partial<ServiceConfig> {
+  if (key === "rateLimit.rps" || key === "rateLimit.concurrency") {
+    const name = key.split(".")[1] as "rps" | "concurrency";
+    const number = value ? Number(value) : undefined;
+    return {
+      rateLimit: {
+        ...service.rateLimit,
+        [name]: number && number > 0 ? number : undefined,
+      },
+    };
+  }
+  if (key === "headers") {
+    try {
+      const headers: unknown = value ? JSON.parse(value) : undefined;
+      return headers && typeof headers === "object" && !Array.isArray(headers)
+        ? { headers: headers as Record<string, string> }
+        : { headers: undefined };
+    } catch {
+      return {};
+    }
+  }
+  if (
+    key === "temperature" ||
+    key === "maxTokens" ||
+    key === "timeoutMs" ||
+    key === "maxBatchSize" ||
+    key === "maxBatchChars"
+  ) {
+    const number = value ? Number(value) : undefined;
+    return { [key]: number } as Partial<ServiceConfig>;
+  }
+  return { [key]: value || undefined } as Partial<ServiceConfig>;
 }
 
 function FeaturesPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
@@ -499,7 +576,11 @@ function FeaturesPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
         <Toggle
           checked={config.selection.enabled}
           label={t("common.enabled")}
-          onChange={(enabled) => save(onPatch, { selection: { enabled } })}
+          onChange={(enabled) =>
+            save(onPatch, {
+              selection: { ...config.selection, enabled },
+            })
+          }
         />
       </Card>
       <Card title={t("features.hover")}>
@@ -532,6 +613,7 @@ function FeaturesPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
           </Field>
         </div>
       </Card>
+      <ExpandedFeatureCards config={config} onPatch={onPatch} />
     </div>
   );
 }
@@ -633,6 +715,7 @@ function RulesPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
           )}
         </div>
       </Card>
+      <LanguageRuleCards config={config} onPatch={onPatch} />
     </div>
   );
 }
@@ -704,7 +787,7 @@ function GlossaryPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
   );
 }
 
-function ShortcutsPanel({ config }: { config: Config }): preact.JSX.Element {
+function ShortcutsPanel({ config }: { config: KConfig }): preact.JSX.Element {
   const shortcutLabels: Record<string, I18nKey> = {
     "toggle-translate": "shortcuts.toggle",
     "toggle-whole-page": "shortcuts.wholePage",
@@ -858,15 +941,11 @@ function DataPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
   );
 }
 
-function positiveInteger(value: string): number | undefined {
-  if (!value) return undefined;
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
-}
-
 function save(
-  update: ConfigUpdater,
-  patch: ConfigPatch | ((config: Config) => ConfigPatch),
+  update: KConfigUpdater,
+  patch:
+    | Partial<Omit<KConfig, "version">>
+    | ((config: KConfig) => Partial<Omit<KConfig, "version">>),
 ): void {
   void update(patch).catch(console.error);
 }

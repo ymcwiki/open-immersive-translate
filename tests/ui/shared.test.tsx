@@ -31,7 +31,14 @@ import {
   parseConfigImport,
   serializeConfig,
 } from "../../src/ui/shared/config-transfer";
-import { languageName, serviceName, t } from "../../src/ui/shared/i18n";
+import {
+  languageName,
+  normalizeUiLocale,
+  serviceName,
+  setUiLocaleOverride,
+  t,
+} from "../../src/ui/shared/i18n";
+import { serviceFields } from "../../src/ui/shared/service-fields";
 import {
   clearCache,
   getCacheCount,
@@ -84,11 +91,38 @@ describe("shared UI primitives", () => {
 
 describe("i18n", () => {
   it("uses Chinese by default and supports English and placeholders", () => {
+    setUiLocaleOverride("auto");
     expect(t("popup.translate")).toBe("翻译");
     expect(t("popup.shortcut", { shortcut: "Alt+A" })).toContain("Alt+A");
     expect(t("popup.translate", {}, "en")).toBe("Translate");
     expect(languageName("zh-CN")).toBe("简体中文");
     expect(serviceName("custom-service")).toBe("custom-service");
+  });
+
+  it("supports Traditional Chinese and Japanese locale tables", () => {
+    expect(t("popup.translate", {}, "zh-TW")).toBe("翻譯");
+    expect(t("popup.translate", {}, "ja")).toBe("翻訳");
+    expect(normalizeUiLocale("zh-HK")).toBe("zh-TW");
+    expect(normalizeUiLocale("ja-JP")).toBe("ja");
+    expect(normalizeUiLocale("fr-FR")).toBe("en");
+  });
+});
+
+describe("service field descriptors", () => {
+  it("drives AI and custom HTTP credential forms", () => {
+    expect(serviceFields("openai-compatible").map(({ key }) => key)).toContain(
+      "model",
+    );
+    expect(serviceFields("custom-http").map(({ key }) => key)).toEqual(
+      expect.arrayContaining([
+        "headers",
+        "requestBodyTemplate",
+        "responseJsonPath",
+      ]),
+    );
+    expect(serviceFields("google").map(({ key }) => key)).not.toContain(
+      "apiKey",
+    );
   });
 });
 
