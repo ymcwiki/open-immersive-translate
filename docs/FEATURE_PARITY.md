@@ -16,51 +16,51 @@
 | A8 | stayOriginal（code/img/math/sup/sub） | ✅ | 1 |
 | A9 | `<br>` 分行拆段 | ✅ | 1 |
 | A10 | Shadow DOM 翻译 | ✅ | 1 |
-| A11 | iframe 内翻译（all_frames） | 🔧 | 2 |
+| A11 | iframe 内翻译（all_frames） | ✅ | 2 |
 | A12 | 标题（document.title）翻译 | ✅ | 1 |
-| A13 | 页面级语言检测 + 同语言跳过 | 🔧 | 2 |
-| A14 | 段落级语言检测 | 🔧 | 2 |
+| A13 | 页面级语言检测 + 同语言跳过 | ✅ | 2 |
+| A14 | 段落级语言检测 | ✅ | 2 |
 | A15 | 总是翻译 / 从不翻译（按站点） | ✅ | 1 |
-| A16 | 总是翻译 / 从不翻译（按语言） | ⬜ | 3 |
-| A17 | 整页 vs 仅正文（main 区域）翻译 | ⬜ | 3 |
-| A18 | 立即翻译到页面底部（不懒加载） | ⬜ | 3 |
+| A16 | 总是翻译 / 从不翻译（按语言） | ✅ | 3 |
+| A17 | 整页 vs 仅正文（main 区域）翻译 | ✅ | 3 |
+| A18 | 立即翻译到页面底部（不懒加载） | ✅ | 3 |
 | A19 | 术语表（glossary）注入 prompt | 🔧 | 2 |
-| A20 | 术语表带领域（domain）规则 | ⬜ | 3 |
-| A21 | 上下文感知（标题/摘要进 prompt） | ⬜ | 3 |
-| A22 | 遮罩模式（译文模糊悬停显示）+ 快捷键 | 🔧 | 3 |
-| A23 | 译文可编辑 | ⬜ | 3 |
-| A24 | pre/code 换行保留与 likePre 处理 | ⬜ | 3 |
+| A20 | 术语表带领域（domain）规则 | ✅ | 3 |
+| A21 | 上下文感知（标题/摘要进 prompt） | ✅ | 3 |
+| A22 | 遮罩模式（译文模糊悬停显示）+ 快捷键 | ✅ | 3 |
+| A23 | 译文可编辑 | ✅ | 3 |
+| A24 | pre/code 换行保留与 likePre 处理 | ✅ | 3 |
 | A25 | 翻译错误提示 + 单段重试 | ✅ | 1 |
 | A26 | 译文缓存（IndexedDB，过期清理） | ✅ | 1 |
 | A27 | 同一服务失败自动 fallback 到备用服务 | ✅ | 1 |
-| A28 | 按 URL 指定翻译模式（dual/translation） | ⬜ | 3 |
-| A29 | 按语言指定翻译模式 | ⬜ | 3 |
-| A30 | 翻译中/完成的页面状态角标（badge） | ⬜ | 3 |
+| A28 | 按 URL 指定翻译模式（dual/translation） | ✅ | 3 |
+| A29 | 按语言指定翻译模式 | ✅ | 3 |
+| A30 | 翻译中/完成的页面状态角标（badge） | ✅ | 3 |
 
 ## B. 译文样式
 | # | 功能 | 状态 | 阶段 |
 |---|---|---|---|
 | B1 | 主题：underline dashed dotted highlight mask opacity blockquote paper bold italic grey dividingLine wavy marker none | ✅ | 1 |
-| B2 | 主题：dashedBorder solidBorder thinDashed nativeUnderline nativeDashed nativeDotted weakening blur | ⬜ | 3 |
+| B2 | 主题：dashedBorder solidBorder thinDashed nativeUnderline nativeDashed nativeDotted weakening blur | ✅ | 3 |
 | B3 | 译文字体选择 | ✅ | 1 |
-| B4 | 译文字号/颜色自定义 | ⬜ | 3 |
-| B5 | 按站点主题（translationThemePatterns） | ⬜ | 3 |
+| B4 | 译文字号/颜色自定义 | ✅ | 3 |
+| B5 | 按站点主题（translationThemePatterns） | ✅ | 3 |
 | B6 | 深色模式适配 | ✅ | 1 |
 | B7 | 站点自定义注入 CSS（injectedCss） | ✅ | 1 |
-| B8 | 全局自定义 CSS | ⬜ | 3 |
+| B8 | 全局自定义 CSS | ✅ | 3 |
 
 ## C. 交互入口
 | # | 功能 | 状态 | 阶段 |
 |---|---|---|---|
-| C1 | 快捷键：toggleTranslatePage / WholePage / MainPage | 🔧 | 3 |
-| C2 | 快捷键：toggleOnlyTranslation / ToPageEndImmediately / TranslationMask / MouseHoverDirectly / VideoSubtitlePreTranslation / SidePanel / InputBox / AiWriting | ⬜ | 3 |
-| C3 | 快捷键：translateWith{Google,Bing,DeepL,OpenAI,Claude,Gemini,Custom1-3} | ⬜ | 3 |
+| C1 | 快捷键：toggleTranslatePage / WholePage / MainPage | ✅ | 3 |
+| C2 | 快捷键：toggleOnlyTranslation / ToPageEndImmediately / TranslationMask / MouseHoverDirectly / VideoSubtitlePreTranslation / SidePanel / InputBox / AiWriting | 🔧 | 3 |
+| C3 | 快捷键：translateWith{Google,Bing,DeepL,OpenAI,Claude,Gemini,Custom1-3} | ✅ | 3 |
 | C4 | Popup：开关、服务、语言、模式、站点开关 | ✅ | 1 |
 | C5 | Popup：更多菜单（设置、快捷键、缓存、反馈） | 🔧 | 3 |
 | C6 | 悬浮球（拖动、右键菜单、位置记忆） | ✅ | 1 |
 | C7 | 右键菜单（翻译网页 / 选中文本） | 🔧 | 2 |
 | C8 | 鼠标悬停 + 修饰键翻译单段 | ✅ | 1 |
-| C9 | 悬停直接翻译（无需修饰键）开关 | ⬜ | 3 |
+| C9 | 悬停直接翻译（无需修饰键）开关 | ✅ | 3 |
 | C10 | 划词翻译（迷你面板） | ✅ | 1 |
 | C11 | 划词：单词词典模式（音标/词性/例句） | ⬜ | 3 |
 | C12 | 划词：朗读（TTS） | ⬜ | 3 |

@@ -1,6 +1,11 @@
 import type { Paragraph, Rule } from "../../shared/types";
+import type {
+  AdvancedPageRule,
+  AdvancedParagraph,
+} from "../../shared/j-types";
 import { isBlockElement } from "./block-detect";
 import { encode } from "./placeholder";
+import { isPreLikeElement } from "./pre-like";
 
 const DEFAULT_PLACEHOLDER_STYLE = { open: "{", close: "}" } as const;
 
@@ -220,6 +225,14 @@ export function extractParagraphs(root: Node, rule: Rule): Paragraph[] {
   const paragraphs: Paragraph[] = [];
   const idCounts = new Map<string, number>();
   const minimumLength = rule.paragraphMinTextCount ?? 2;
+  const advancedRule = rule as AdvancedPageRule;
+
+  const paragraphId = (container: Element, text: string): string => {
+    const baseId = `imt-${stableHash(`${elementPath(container)}\0${text}`)}`;
+    const occurrence = (idCounts.get(baseId) ?? 0) + 1;
+    idCounts.set(baseId, occurrence);
+    return occurrence === 1 ? baseId : `${baseId}-${occurrence}`;
+  };
 
   const addParagraph = (container: Element, nodes: readonly Node[]): void => {
     const sourceText = plainText(nodes, rule).trim();
@@ -234,17 +247,27 @@ export function extractParagraphs(root: Node, rule: Rule): Paragraph[] {
     const text = encoded.text.trim();
     if (!text) return;
 
-    const baseId = `imt-${stableHash(`${elementPath(container)}\0${text}`)}`;
-    const occurrence = (idCounts.get(baseId) ?? 0) + 1;
-    idCounts.set(baseId, occurrence);
-
     paragraphs.push({
-      id: occurrence === 1 ? baseId : `${baseId}-${occurrence}`,
+      id: paragraphId(container, text),
       container,
       nodes: [...nodes],
       text,
       placeholders: encoded.placeholders,
     });
+  };
+
+  const emitPreLike = (element: Element): void => {
+    const text = element.textContent ?? "";
+    if (text.trim().length < minimumLength) return;
+    const paragraph: AdvancedParagraph = {
+      id: paragraphId(element, text),
+      container: element,
+      nodes: [...element.childNodes],
+      text,
+      placeholders: new Map(),
+      preformatted: true,
+    };
+    paragraphs.push(paragraph);
   };
 
   const emitRun = (container: Element, nodes: readonly Node[]): void => {
@@ -301,6 +324,11 @@ export function extractParagraphs(root: Node, rule: Rule): Paragraph[] {
       if (child.nodeType !== 1) continue;
 
       const element = child as Element;
+      if (isPreLikeElement(element, advancedRule)) {
+        flush();
+        emitPreLike(element);
+        continue;
+      }
       if (shouldSkipElement(element, rule)) continue;
       if (isBreak(element) || isStayOriginal(element, rule)) {
         run.push(element);
@@ -340,6 +368,10 @@ export function extractParagraphs(root: Node, rule: Rule): Paragraph[] {
   };
 
   const visitElement = (element: Element): void => {
+    if (isPreLikeElement(element, advancedRule)) {
+      emitPreLike(element);
+      return;
+    }
     if (shouldSkipElement(element, rule)) return;
     if (isAtomic(element, rule)) {
       emitAtomic(element);
