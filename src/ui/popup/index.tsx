@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import browser from "webextension-polyfill";
 
 import { LANGUAGE_CODES } from "../../shared/lang";
-import { sendToTab } from "../../shared/messages";
+import { sendToBackground, sendToTab } from "../../shared/messages";
 import type { LangCode, TranslationMode } from "../../shared/types";
 import { Button, Field, Select, Toggle } from "../shared/components";
 import {
@@ -29,9 +29,13 @@ export function Popup(): preact.JSX.Element {
   const [toggleError, setToggleError] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [menuStatus, setMenuStatus] = useState<string>();
+  const [chatgptLoggedIn, setChatgptLoggedIn] = useState(false);
 
   useEffect(() => {
     void getActiveTab().then(setActiveTab).catch(console.error);
+    void sendToBackground({ type: "chatgptOauth.status" })
+      .then((status) => setChatgptLoggedIn(status.state === "authenticated"))
+      .catch(() => setChatgptLoggedIn(false));
   }, []);
 
   const languageOptions = useMemo(
@@ -62,10 +66,12 @@ export function Popup(): preact.JSX.Element {
   const never = hostname
     ? config.neverTranslateSites.includes(hostname)
     : false;
-  const services = Object.keys(config.services).map((id) => ({
-    value: id,
-    label: serviceName(id),
-  }));
+  const services = Object.keys(config.services)
+    .filter((id) => id !== "chatgpt" || chatgptLoggedIn)
+    .map((id) => ({
+      value: id,
+      label: serviceName(id),
+    }));
 
   const togglePage = async (): Promise<void> => {
     if (activeTab.id === undefined) {

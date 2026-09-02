@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("webextension-polyfill", () => ({ default: {} }));
 
 import {
   getModels,
@@ -71,6 +73,10 @@ describe("translation service metadata", () => {
       serviceFields("deepl", "en").find(({ name }) => name === "formality")
         ?.label,
     ).toBe("Formality");
+    expect(serviceFields("chatgpt").map(({ name }) => name)).toContain("auth");
+    expect(serviceFields("chatgpt").map(({ name }) => name)).not.toContain(
+      "apiKey",
+    );
   });
 
   it("renders all six prompt variables and exposes subtitle and selection variants", () => {

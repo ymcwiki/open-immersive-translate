@@ -182,4 +182,23 @@ describe("Popup", () => {
       type: "clearCache",
     });
   });
+
+  it("lists ChatGPT only when OAuth is authenticated", async () => {
+    browserMock.runtime.sendMessage.mockImplementation(
+      async (message: { type?: string }) =>
+        message.type === "chatgptOauth.status"
+          ? { state: "authenticated", account: {} }
+          : undefined,
+    );
+    render(<Popup />);
+
+    const select = (await screen.findByLabelText(
+      "翻译服务",
+    )) as HTMLSelectElement;
+    await waitFor(() =>
+      expect(
+        Array.from(select.options).map((option) => option.value),
+      ).toContain("chatgpt"),
+    );
+  });
 });

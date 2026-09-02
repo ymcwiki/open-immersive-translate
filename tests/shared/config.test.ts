@@ -48,6 +48,10 @@ describe("configuration migration", () => {
       kind: "gemini",
       enabled: false,
     });
+    expect(migrated.services.chatgpt).toEqual({
+      kind: "chatgpt",
+      enabled: false,
+    });
     expect(migrated.shortcuts.toggleTranslatePage).toBe("Alt+Q");
     expect(migrated.subtitle).toMatchObject({
       youtube: false,

@@ -141,6 +141,16 @@ describe("configuration transfer", () => {
 
     expect(serializeConfig(config, true)).not.toContain("secret");
     expect(serializeConfig(config, false)).toContain("secret");
+    const unsafeConfig = structuredClone(config);
+    const unsafeServices = unsafeConfig.services as unknown as Record<
+      string,
+      Record<string, unknown>
+    >;
+    Object.assign(unsafeServices.chatgpt!, {
+      accessToken: "oauth-access-secret",
+      refresh_token: "oauth-refresh-secret",
+    });
+    expect(serializeConfig(unsafeConfig, false)).not.toContain("oauth-");
     expect(parseConfigImport("not json")).toEqual({
       ok: false,
       reason: "invalid-json",

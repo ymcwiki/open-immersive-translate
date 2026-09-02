@@ -163,6 +163,68 @@ body {
   margin-bottom: 14px;
 }
 
+.chatgpt-auth-field {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-panel-muted);
+}
+
+.chatgpt-auth-field p,
+.chatgpt-auth-field dl {
+  margin: 0;
+}
+
+.chatgpt-user-code {
+  margin: 10px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.chatgpt-auth-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chatgpt-auth-account,
+.chatgpt-auth-account dl,
+.chatgpt-auth-field details {
+  display: grid;
+  gap: 10px;
+}
+
+.chatgpt-auth-account dl > div {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.chatgpt-auth-account dt {
+  color: var(--ui-muted);
+}
+
+.chatgpt-auth-account dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.chatgpt-auth-field summary {
+  color: var(--ui-accent);
+  cursor: pointer;
+}
+
+.chatgpt-auth-field textarea {
+  min-height: 120px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
 .password-field {
   display: grid;
   grid-template-columns: 1fr auto;

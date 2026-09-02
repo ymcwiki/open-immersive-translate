@@ -45,6 +45,7 @@ const remoteRuleSubscriptionSchema = z.object({
 export const serviceConfigSchema: z.ZodType<ServiceConfig> = z.object({
   kind: z.enum([
     "openai-compatible",
+    "chatgpt",
     "claude",
     "gemini",
     "google",
@@ -151,6 +152,7 @@ export const ruleSchema: z.ZodType<Rule> = z.object({
 
 export const DEFAULT_SERVICES: Record<string, ServiceConfig> = {
   "openai-compatible": { kind: "openai-compatible", enabled: false },
+  chatgpt: { kind: "chatgpt", enabled: false },
   claude: { kind: "claude", enabled: false },
   gemini: { kind: "gemini", enabled: false },
   google: { kind: "google", enabled: true },

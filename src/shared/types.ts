@@ -166,6 +166,7 @@ export interface TranslationService {
 /** Supported adapter families for persisted service configuration. */
 export type ServiceKind =
   | "openai-compatible"
+  | "chatgpt"
   | "claude"
   | "gemini"
   | "google"

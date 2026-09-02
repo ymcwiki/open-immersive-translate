@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("webextension-polyfill", () => ({ default: {} }));
 
 import {
   createService,
@@ -11,6 +13,7 @@ describe("service registry", () => {
   it("lists built-ins and creates a configured adapter with a custom id", () => {
     expect(listServices().map((service) => service.id)).toEqual([
       "openai-compatible",
+      "chatgpt",
       "claude",
       "google",
       "deeplx",

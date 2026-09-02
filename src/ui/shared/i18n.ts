@@ -98,6 +98,21 @@ const zhCN = {
   "services.testFailedDetail": "连接失败（{latency} ms）：{error}",
   "services.unsupportedPair":
     "该服务不支持 {from} → {to}；翻译时会尝试已配置的备用服务。",
+  "oauth.login": "登录 ChatGPT",
+  "oauth.waiting": "正在等待 ChatGPT 登录…",
+  "oauth.userCode": "ChatGPT 登录代码",
+  "oauth.copyCode": "复制代码",
+  "oauth.openLogin": "打开登录页面",
+  "oauth.loggedIn": "已登录 ChatGPT",
+  "oauth.email": "账号",
+  "oauth.plan": "套餐",
+  "oauth.expiry": "访问令牌到期时间",
+  "oauth.logout": "退出登录",
+  "oauth.retry": "重新登录",
+  "oauth.statusFailed": "无法读取 ChatGPT 登录状态",
+  "oauth.importTitle": "从 Codex CLI 导入",
+  "oauth.importHint": "粘贴 ~/.codex/auth.json 的完整内容。",
+  "oauth.importButton": "导入并登录",
   "features.input": "输入框翻译",
   "features.inputTrigger": "触发方式",
   "features.triggerSlash": "以 // 开头",
@@ -217,6 +232,7 @@ const zhCN = {
   "writing.noText": "请先选中文字或聚焦有内容的输入框",
   "writing.copied": "已复制",
   "service.openai-compatible": "OpenAI 兼容",
+  "service.chatgpt": "ChatGPT 账号（OAuth）",
   "service.claude": "Claude",
   "service.google": "Google 翻译",
   "service.deeplx": "DeepLX",
@@ -344,6 +360,21 @@ const en: Record<I18nKey, string> = {
   "services.testFailedDetail": "Connection failed ({latency} ms): {error}",
   "services.unsupportedPair":
     "This service does not support {from} → {to}; translation will try the configured fallback.",
+  "oauth.login": "Log in to ChatGPT",
+  "oauth.waiting": "Waiting for ChatGPT login…",
+  "oauth.userCode": "ChatGPT login code",
+  "oauth.copyCode": "Copy code",
+  "oauth.openLogin": "Open login page",
+  "oauth.loggedIn": "Logged in to ChatGPT",
+  "oauth.email": "Account",
+  "oauth.plan": "Plan",
+  "oauth.expiry": "Access token expires",
+  "oauth.logout": "Log out",
+  "oauth.retry": "Log in again",
+  "oauth.statusFailed": "Could not read ChatGPT login status",
+  "oauth.importTitle": "Import from Codex CLI",
+  "oauth.importHint": "Paste the complete contents of ~/.codex/auth.json.",
+  "oauth.importButton": "Import and log in",
   "features.input": "Input translation",
   "features.inputTrigger": "Trigger",
   "features.triggerSlash": "Starts with //",
@@ -465,6 +496,7 @@ const en: Record<I18nKey, string> = {
   "writing.noText": "Select text or focus a non-empty input first",
   "writing.copied": "Copied",
   "service.openai-compatible": "OpenAI compatible",
+  "service.chatgpt": "ChatGPT account (OAuth)",
   "service.claude": "Claude",
   "service.google": "Google Translate",
   "service.deeplx": "DeepLX",
@@ -487,7 +519,7 @@ const en: Record<I18nKey, string> = {
   "lang.th": "Thai",
 };
 
-const zhTW: Record<I18nKey, string> = {
+const zhTW: Partial<Record<I18nKey, string>> = {
   ...zhCN,
   "app.name": "雙語翻譯",
   "common.loading": "正在載入…",
@@ -725,7 +757,7 @@ const zhTW: Record<I18nKey, string> = {
   "lang.th": "泰文",
 };
 
-const ja: Record<I18nKey, string> = {
+const ja: Partial<Record<I18nKey, string>> = {
   ...en,
   "app.name": "バイリンガル翻訳",
   "common.loading": "読み込み中…",
@@ -969,7 +1001,7 @@ const ja: Record<I18nKey, string> = {
   "lang.th": "タイ語",
 };
 
-const tables: Record<UiLocale, Record<I18nKey, string>> = {
+const tables: Record<UiLocale, Partial<Record<I18nKey, string>>> = {
   "zh-CN": zhCN,
   "zh-TW": zhTW,
   ja,
@@ -1010,7 +1042,7 @@ export function t(
 ): string {
   return Object.entries(values).reduce(
     (message, [name, value]) => message.replaceAll(`{${name}}`, String(value)),
-    tables[locale][key],
+    tables[locale][key] ?? en[key],
   );
 }
 

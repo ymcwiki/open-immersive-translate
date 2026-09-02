@@ -1,9 +1,9 @@
 import { serviceText, type ServiceI18nKey, type ServiceUiLocale } from "./i18n";
 import { getPreset } from "./presets";
 
-export type ServiceFieldName = ServiceI18nKey;
+export type ServiceFieldName = ServiceI18nKey | "auth";
 export type ServiceFieldType =
-  "text" | "password" | "select" | "checkbox" | "model" | "textarea";
+  "text" | "password" | "select" | "checkbox" | "model" | "textarea" | "auth";
 
 export interface ServiceFieldDescriptor {
   name: ServiceFieldName;
@@ -14,7 +14,7 @@ export interface ServiceFieldDescriptor {
   allowCustom?: boolean;
 }
 
-const credentials: Record<string, readonly ServiceFieldName[]> = {
+const credentials: Record<string, readonly ServiceI18nKey[]> = {
   gemini: ["apiKey"],
   deepl: ["apiKey", "baseUrl", "formality"],
   "deepl-pro": ["apiKey", "baseUrl", "formality"],
@@ -43,7 +43,7 @@ const credentials: Record<string, readonly ServiceFieldName[]> = {
   ],
 };
 
-const aiFields: readonly ServiceFieldName[] = [
+const aiFields: readonly ServiceI18nKey[] = [
   "apiKey",
   "baseUrl",
   "model",
@@ -60,7 +60,7 @@ const aiFields: readonly ServiceFieldName[] = [
   "fallbackService",
 ];
 
-const transportFields: readonly ServiceFieldName[] = [
+const transportFields: readonly ServiceI18nKey[] = [
   "timeoutMs",
   "maxBatchSize",
   "maxBatchChars",
@@ -68,6 +68,7 @@ const transportFields: readonly ServiceFieldName[] = [
 ];
 
 function fieldType(name: ServiceFieldName): ServiceFieldType {
+  if (name === "auth") return "auth";
   if (name === "apiKey" || name === "secret") return "password";
   if (name === "stream") return "checkbox";
   if (name === "formality") return "select";
@@ -101,6 +102,16 @@ export function getModels(
     claude: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"],
     gemini: ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"],
     "azure-openai": ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"],
+    chatgpt: [
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
+      "gpt-5.5",
+      "gpt-5.4-mini",
+      "gpt-5.4",
+      "gpt-5.3-codex",
+      "gpt-5.3-codex-spark",
+    ],
   };
   return [
     ...new Set([
@@ -115,6 +126,28 @@ export function serviceFields(
   serviceId: string,
   locale: ServiceUiLocale = "zh-CN",
 ): readonly ServiceFieldDescriptor[] {
+  if (serviceId === "chatgpt") {
+    return [
+      "auth",
+      "model",
+      "promptSystem",
+      "promptUser",
+      "timeoutMs",
+      "maxBatchSize",
+      "maxBatchChars",
+      "fallbackService",
+    ].map((name) => ({
+      name: name as ServiceFieldName,
+      label:
+        name === "auth"
+          ? "ChatGPT OAuth"
+          : serviceText(name as ServiceI18nKey, locale),
+      type: fieldType(name as ServiceFieldName),
+      ...(name === "model"
+        ? { options: getModels(serviceId), allowCustom: true }
+        : {}),
+    }));
+  }
   const isAi =
     Boolean(getPreset(serviceId)) ||
     ["openai-compatible", "claude", "gemini", "azure-openai"].includes(

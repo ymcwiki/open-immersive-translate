@@ -3,6 +3,7 @@ import { CustomHttpService } from "./custom-http";
 import { DeepLXService } from "./deeplx";
 import { GoogleService } from "./google";
 import { OpenAICompatibleService } from "./openai-compatible";
+import { ChatgptOauthService } from "./chatgpt-oauth/service";
 import { MockService } from "./mock";
 import { TranslateError, type TranslationService } from "./base";
 import type { ServiceConfig } from "../../shared/types";
@@ -17,6 +18,7 @@ export { OPENAI_PROVIDER_PRESETS } from "./presets";
 
 const services: TranslationService[] = [
   new OpenAICompatibleService(),
+  new ChatgptOauthService(),
   new ClaudeService(),
   new GoogleService(),
   new DeepLXService(),
@@ -76,6 +78,18 @@ export function createService(
         apiPath: config.apiPath,
         temperature: config.temperature,
         maxTokens: config.maxTokens,
+        ignoreResRegexs: config.ignoreResRegexs,
+      });
+    case "chatgpt":
+      return new ChatgptOauthService({
+        model: config.model,
+        prompt: config.prompt,
+        promptSystem: config.promptSystem,
+        promptUser: config.promptUser,
+        timeoutMs: config.timeoutMs,
+        maxBatchSize: config.maxBatchSize,
+        maxBatchChars: config.maxBatchChars,
+        rateLimit: config.rateLimit,
         ignoreResRegexs: config.ignoreResRegexs,
       });
     case "claude":

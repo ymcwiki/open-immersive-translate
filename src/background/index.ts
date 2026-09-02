@@ -43,6 +43,14 @@ import {
 } from "./services";
 import { TranslateError, type TranslationService } from "./services/base";
 import { runServiceTest } from "./service-test";
+import {
+  cancelChatgptOauth,
+  getChatgptOauthStatus,
+  importCodexCliAuth,
+  logoutChatgptOauth,
+  registerChatgptOauthPolling,
+  startChatgptOauth,
+} from "./services/chatgpt-oauth/auth";
 
 interface NativeSidePanelApi {
   open(options: { tabId: number }): Promise<void>;
@@ -67,6 +75,7 @@ function actionApi(): BadgeActionApi {
 initTranslationServices();
 registerRemoteRules();
 initPdfInterception();
+registerChatgptOauthPolling();
 const pageBadges = new PageBadgeController(actionApi());
 
 async function configuredRule(url: string): Promise<Rule> {
@@ -214,6 +223,16 @@ browser.runtime.onMessage.addListener(
         return serviceList();
       case "testService":
         return testService(request.serviceId, request.config);
+      case "chatgptOauth.start":
+        return startChatgptOauth();
+      case "chatgptOauth.status":
+        return getChatgptOauthStatus();
+      case "chatgptOauth.cancel":
+        return cancelChatgptOauth();
+      case "chatgptOauth.logout":
+        return logoutChatgptOauth();
+      case "chatgptOauth.importCli":
+        return importCodexCliAuth(request.json);
       case "getCacheStats":
         return getTranslationCacheCount().then((count) => ({ count }));
       case "clearCache":

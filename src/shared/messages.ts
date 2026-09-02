@@ -116,6 +116,47 @@ export interface TestServiceMessage {
   config?: ServiceConfig;
 }
 
+export interface ChatgptOauthAccount {
+  accountId?: string;
+  email?: string;
+  planType?: string;
+  expiresAt?: number;
+}
+
+export type ChatgptOauthStatus =
+  | { state: "logged_out" }
+  | {
+      state: "pending";
+      userCode: string;
+      verificationUrl: string;
+      startedAt: number;
+      expiresAt: number;
+      nextPollAt: number;
+    }
+  | { state: "authenticated"; account: ChatgptOauthAccount }
+  | { state: "error"; error: string; retryAfter?: number };
+
+export interface ChatgptOauthStartMessage {
+  type: "chatgptOauth.start";
+}
+
+export interface ChatgptOauthStatusMessage {
+  type: "chatgptOauth.status";
+}
+
+export interface ChatgptOauthCancelMessage {
+  type: "chatgptOauth.cancel";
+}
+
+export interface ChatgptOauthLogoutMessage {
+  type: "chatgptOauth.logout";
+}
+
+export interface ChatgptOauthImportCliMessage {
+  type: "chatgptOauth.importCli";
+  json: string;
+}
+
 export type ServiceTestResult =
   | { ok: true; latencyMs: number; sample: string }
   | { ok: false; latencyMs: number; error: string };
@@ -250,6 +291,11 @@ export type Msg =
   | TranslateSelectionMessage
   | GetServicesMessage
   | TestServiceMessage
+  | ChatgptOauthStartMessage
+  | ChatgptOauthStatusMessage
+  | ChatgptOauthCancelMessage
+  | ChatgptOauthLogoutMessage
+  | ChatgptOauthImportCliMessage
   | GetCacheStatsMessage
   | ClearCacheMessage
   | ValidateRuleMessage
@@ -276,6 +322,11 @@ export type BackgroundRequest =
   | SetConfigMessage
   | GetServicesMessage
   | TestServiceMessage
+  | ChatgptOauthStartMessage
+  | ChatgptOauthStatusMessage
+  | ChatgptOauthCancelMessage
+  | ChatgptOauthLogoutMessage
+  | ChatgptOauthImportCliMessage
   | GetCacheStatsMessage
   | ClearCacheMessage
   | ValidateRuleMessage
@@ -312,23 +363,30 @@ export type BackgroundResponse<T extends BackgroundRequest> =
               ? ServiceInfo[]
               : T extends TestServiceMessage
                 ? ServiceTestResult
-                : T extends GetCacheStatsMessage
-                  ? CacheStatsResult
-                  : T extends ClearCacheMessage
-                    ? ClearCacheResult
-                    : T extends ValidateRuleMessage
-                      ? RuleValidationResult
-                      : T extends OpenOptionsMessage
-                        ? OpenOptionsResult
-                        : T extends AssistantRequestMessage
-                          ? AssistantResponse
-                          : T extends GetAssistantCapabilitiesMessage
-                            ? AssistantCapabilities
-                            : T extends OpenSidePanelMessage
-                              ? OpenSidePanelResult
-                              : T extends PageTranslationStateMessage
-                                ? PageTranslationStateAcknowledgement
-                                : never;
+                : T extends
+                      | ChatgptOauthStartMessage
+                      | ChatgptOauthStatusMessage
+                      | ChatgptOauthCancelMessage
+                      | ChatgptOauthLogoutMessage
+                      | ChatgptOauthImportCliMessage
+                  ? ChatgptOauthStatus
+                  : T extends GetCacheStatsMessage
+                    ? CacheStatsResult
+                    : T extends ClearCacheMessage
+                      ? ClearCacheResult
+                      : T extends ValidateRuleMessage
+                        ? RuleValidationResult
+                        : T extends OpenOptionsMessage
+                          ? OpenOptionsResult
+                          : T extends AssistantRequestMessage
+                            ? AssistantResponse
+                            : T extends GetAssistantCapabilitiesMessage
+                              ? AssistantCapabilities
+                              : T extends OpenSidePanelMessage
+                                ? OpenSidePanelResult
+                                : T extends PageTranslationStateMessage
+                                  ? PageTranslationStateAcknowledgement
+                                  : never;
 
 /** Messages sent directly to a tab's content script. */
 export type TabMessage =

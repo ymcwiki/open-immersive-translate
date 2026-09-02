@@ -1,5 +1,5 @@
 import { render } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 
 import { builtinRules } from "../../background/rules/builtin-rules";
 import {
@@ -12,6 +12,7 @@ import {
 import { LANGUAGE_CODES } from "../../shared/lang";
 import {
   sendToBackground,
+  type ChatgptOauthStatus,
   type ServiceTestResult,
 } from "../../shared/messages";
 import { EXTENSION_COMMAND_IDS } from "../../background/commands";
@@ -424,6 +425,20 @@ function ServiceCard({
             service={service}
             showKey={showKey}
             onToggleKey={() => setShowKey((value) => !value)}
+            onAuthChange={(authenticated) =>
+              save(onPatch, (current) => ({
+                services: {
+                  ...current.services,
+                  [serviceId]: {
+                    ...current.services[serviceId]!,
+                    enabled: authenticated,
+                  },
+                },
+                ...(!authenticated && current.service === serviceId
+                  ? { service: "google" }
+                  : {}),
+              }))
+            }
             onChange={(value) =>
               updateService(serviceFieldPatch(field.name, value))
             }
@@ -481,6 +496,7 @@ function ServiceField({
   service,
   showKey,
   onToggleKey,
+  onAuthChange,
   onChange,
 }: {
   descriptor: ServiceFieldDescriptor;
@@ -488,8 +504,12 @@ function ServiceField({
   service: ServiceConfig;
   showKey: boolean;
   onToggleKey: () => void;
+  onAuthChange: (authenticated: boolean) => void;
   onChange: (value: string) => void;
 }): preact.JSX.Element {
+  if (descriptor.type === "auth") {
+    return <ChatgptOauthField onAuthChange={onAuthChange} />;
+  }
   const id = `${serviceId}-${descriptor.name}`;
   const value = serviceFieldValue(service, descriptor.name);
   const label = descriptor.label;
@@ -583,6 +603,7 @@ function serviceFieldValue(
   service: ServiceConfig,
   key: ServiceFieldDescriptor["name"],
 ): string {
+  if (key === "auth") return "";
   const value = service[key];
   if (key === "models") return service.models?.join("\n") ?? "";
   if (key === "headers") return value ? JSON.stringify(value, null, 2) : "";
@@ -593,6 +614,7 @@ function serviceFieldPatch(
   key: ServiceFieldDescriptor["name"],
   value: string,
 ): Partial<ServiceConfig> {
+  if (key === "auth") return {};
   if (key === "stream") return { stream: value === "true" };
   if (key === "models") {
     return {
@@ -624,6 +646,224 @@ function serviceFieldPatch(
     } as Partial<ServiceConfig>;
   }
   return { [key]: value || undefined } as Partial<ServiceConfig>;
+}
+
+function ChatgptOauthField({
+  onAuthChange,
+}: {
+  onAuthChange: (authenticated: boolean) => void;
+}): preact.JSX.Element {
+  const [status, setStatus] = useState<ChatgptOauthStatus>();
+  const [busy, setBusy] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importJson, setImportJson] = useState("");
+  const [actionError, setActionError] = useState<string>();
+  const enabledForSession = useRef(false);
+
+  const loadStatus = async (): Promise<void> => {
+    try {
+      const next = await sendToBackground({ type: "chatgptOauth.status" });
+      setStatus(next);
+      if (next.state === "authenticated" && !enabledForSession.current) {
+        enabledForSession.current = true;
+        onAuthChange(true);
+      }
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : t("oauth.statusFailed"),
+      );
+    }
+  };
+
+  useEffect(() => {
+    let disposed = false;
+    const refresh = (): void => {
+      void sendToBackground({ type: "chatgptOauth.status" })
+        .then((next) => {
+          if (disposed) return;
+          setStatus(next);
+          if (next.state === "authenticated" && !enabledForSession.current) {
+            enabledForSession.current = true;
+            onAuthChange(true);
+          }
+        })
+        .catch((error: unknown) => {
+          if (!disposed) {
+            setActionError(
+              error instanceof Error ? error.message : t("oauth.statusFailed"),
+            );
+          }
+        });
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 1_500);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const run = async (
+    action: () => Promise<ChatgptOauthStatus>,
+  ): Promise<void> => {
+    setBusy(true);
+    setActionError(undefined);
+    try {
+      const next = await action();
+      setStatus(next);
+      if (next.state === "authenticated") {
+        enabledForSession.current = true;
+        onAuthChange(true);
+      }
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : t("common.failed"),
+      );
+      await loadStatus();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const loggedOut = !status || status.state === "logged_out";
+  return (
+    <div class="chatgpt-auth-field">
+      {loggedOut && (
+        <Button
+          variant="primary"
+          disabled={busy || !status}
+          onClick={() =>
+            void run(() => sendToBackground({ type: "chatgptOauth.start" }))
+          }
+        >
+          {t("oauth.login")}
+        </Button>
+      )}
+
+      {status?.state === "pending" && (
+        <div class="chatgpt-auth-pending">
+          <p class="ui-status">{t("oauth.waiting")}</p>
+          <div class="chatgpt-user-code" aria-label={t("oauth.userCode")}>
+            {status.userCode}
+          </div>
+          <div class="chatgpt-auth-actions">
+            <Button
+              onClick={() =>
+                void navigator.clipboard?.writeText(status.userCode)
+              }
+            >
+              {t("oauth.copyCode")}
+            </Button>
+            <a href={status.verificationUrl} target="_blank" rel="noreferrer">
+              {t("oauth.openLogin")}
+            </a>
+            <Button
+              variant="quiet"
+              disabled={busy}
+              onClick={() =>
+                void run(() =>
+                  sendToBackground({ type: "chatgptOauth.cancel" }),
+                )
+              }
+            >
+              {t("common.cancel")}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {status?.state === "authenticated" && (
+        <div class="chatgpt-auth-account">
+          <p class="ui-status ui-status-success">{t("oauth.loggedIn")}</p>
+          <dl>
+            {status.account.email && (
+              <div>
+                <dt>{t("oauth.email")}</dt>
+                <dd>{status.account.email}</dd>
+              </div>
+            )}
+            {status.account.planType && (
+              <div>
+                <dt>{t("oauth.plan")}</dt>
+                <dd>{status.account.planType}</dd>
+              </div>
+            )}
+            {status.account.expiresAt && (
+              <div>
+                <dt>{t("oauth.expiry")}</dt>
+                <dd>{new Date(status.account.expiresAt).toLocaleString()}</dd>
+              </div>
+            )}
+          </dl>
+          <Button
+            variant="danger"
+            disabled={busy}
+            onClick={() => {
+              void run(async () => {
+                const next = await sendToBackground({
+                  type: "chatgptOauth.logout",
+                });
+                enabledForSession.current = false;
+                onAuthChange(false);
+                return next;
+              });
+            }}
+          >
+            {t("oauth.logout")}
+          </Button>
+        </div>
+      )}
+
+      {status?.state === "error" && (
+        <div>
+          <p role="alert" class="ui-status ui-status-error">
+            {status.error}
+          </p>
+          <Button
+            variant="primary"
+            disabled={busy}
+            onClick={() =>
+              void run(() => sendToBackground({ type: "chatgptOauth.start" }))
+            }
+          >
+            {t("oauth.retry")}
+          </Button>
+        </div>
+      )}
+
+      {actionError && (
+        <p role="alert" class="ui-status ui-status-error">
+          {actionError}
+        </p>
+      )}
+
+      <details
+        open={importOpen}
+        onToggle={(event) => setImportOpen(event.currentTarget.open)}
+      >
+        <summary>{t("oauth.importTitle")}</summary>
+        <p class="ui-status">{t("oauth.importHint")}</p>
+        <textarea
+          aria-label={t("oauth.importTitle")}
+          value={importJson}
+          onInput={(event) => setImportJson(event.currentTarget.value)}
+        />
+        <Button
+          disabled={busy || !importJson.trim()}
+          onClick={() =>
+            void run(() =>
+              sendToBackground({
+                type: "chatgptOauth.importCli",
+                json: importJson,
+              }),
+            )
+          }
+        >
+          {t("oauth.importButton")}
+        </Button>
+      </details>
+    </div>
+  );
 }
 
 function FeaturesPanel({ config, onPatch }: PanelProps): preact.JSX.Element {

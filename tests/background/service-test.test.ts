@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("webextension-polyfill", () => ({ default: {} }));
+
 import { runServiceTest } from "../../src/background/service-test";
 import type { ServiceConfig } from "../../src/shared/types";
 

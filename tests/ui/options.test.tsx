@@ -269,4 +269,98 @@ describe("Options", () => {
       expect(stored.cache.maxAgeDays).toBe(14);
     });
   });
+
+  it("shows the logged-out ChatGPT OAuth card", async () => {
+    browserMock.runtime.sendMessage.mockImplementation(
+      async (message: { type?: string }) =>
+        message.type === "chatgptOauth.status"
+          ? { state: "logged_out" }
+          : undefined,
+    );
+    render(<Options />);
+    await screen.findByRole("heading", { name: "基本", level: 2 });
+    fireEvent.click(screen.getByRole("tab", { name: "翻译服务" }));
+    fireEvent.change(screen.getByLabelText("选择服务"), {
+      target: { value: "chatgpt" },
+    });
+
+    expect(
+      await screen.findByRole("button", { name: "登录 ChatGPT" }),
+    ).toBeTruthy();
+    expect(screen.getByText("从 Codex CLI 导入")).toBeTruthy();
+  });
+
+  it("shows a pending ChatGPT device code and login link", async () => {
+    browserMock.runtime.sendMessage.mockImplementation(
+      async (message: { type?: string }) =>
+        message.type === "chatgptOauth.status"
+          ? {
+              state: "pending",
+              userCode: "ABCD-EFGH",
+              verificationUrl: "https://auth.openai.com/codex/device",
+              startedAt: Date.now(),
+              expiresAt: Date.now() + 900_000,
+              nextPollAt: Date.now() + 5_000,
+            }
+          : undefined,
+    );
+    render(<Options />);
+    await screen.findByRole("heading", { name: "基本", level: 2 });
+    fireEvent.click(screen.getByRole("tab", { name: "翻译服务" }));
+    fireEvent.change(screen.getByLabelText("选择服务"), {
+      target: { value: "chatgpt" },
+    });
+
+    expect(await screen.findByText("ABCD-EFGH")).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "打开登录页面" }).getAttribute("href"),
+    ).toBe("https://auth.openai.com/codex/device");
+    expect(screen.getByRole("button", { name: "复制代码" })).toBeTruthy();
+  });
+
+  it("shows ChatGPT account details after login", async () => {
+    browserMock.runtime.sendMessage.mockImplementation(
+      async (message: { type?: string }) =>
+        message.type === "chatgptOauth.status"
+          ? {
+              state: "authenticated",
+              account: {
+                email: "reader@example.com",
+                planType: "plus",
+                expiresAt: Date.now() + 3_600_000,
+              },
+            }
+          : undefined,
+    );
+    render(<Options />);
+    await screen.findByRole("heading", { name: "基本", level: 2 });
+    fireEvent.click(screen.getByRole("tab", { name: "翻译服务" }));
+    fireEvent.change(screen.getByLabelText("选择服务"), {
+      target: { value: "chatgpt" },
+    });
+
+    expect(await screen.findByText("reader@example.com")).toBeTruthy();
+    expect(screen.getByText("plus")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "退出登录" })).toBeTruthy();
+  });
+
+  it("shows a ChatGPT OAuth error with a retry action", async () => {
+    browserMock.runtime.sendMessage.mockImplementation(
+      async (message: { type?: string }) =>
+        message.type === "chatgptOauth.status"
+          ? { state: "error", error: "登录代码已失效" }
+          : undefined,
+    );
+    render(<Options />);
+    await screen.findByRole("heading", { name: "基本", level: 2 });
+    fireEvent.click(screen.getByRole("tab", { name: "翻译服务" }));
+    fireEvent.change(screen.getByLabelText("选择服务"), {
+      target: { value: "chatgpt" },
+    });
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "登录代码已失效",
+    );
+    expect(screen.getByRole("button", { name: "重新登录" })).toBeTruthy();
+  });
 });

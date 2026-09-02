@@ -62,7 +62,16 @@ API Key 保存在浏览器的扩展本地存储中，不会写入项目文件。
 
 调度器会先检查所选服务是否支持当前源语言和目标语言。如果不支持，会跳过该服务并尝试它配置的备用服务；没有可用服务时返回明确错误。设置页会在当前服务卡片中直接提示不支持的语言对。
 
-侧边栏对话、词典和 AI 写作需要选择 OpenAI 兼容、Azure OpenAI、Claude 或 Gemini 服务；这些请求只由后台适配器发出，页面脚本不会直接访问服务端接口。
+侧边栏对话、词典和 AI 写作需要选择 ChatGPT 账号、OpenAI 兼容、Azure OpenAI、Claude 或 Gemini 服务；这些请求只由后台适配器发出，页面脚本不会直接访问服务端接口。
+
+## 用 ChatGPT 账号登录（无需 API key）
+
+1. 打开设置页的“翻译服务”，选择“ChatGPT 账号（OAuth）”。
+2. 点击“登录 ChatGPT”，复制页面显示的设备码。
+3. 点击“打开登录页面”，在 `https://auth.openai.com/codex/device` 输入设备码并完成授权。
+4. 设置页显示账号和套餐后，点击“测试连接”。也可以展开“从 Codex CLI 导入”，粘贴 `~/.codex/auth.json` 的完整内容。
+
+此 provider 使用与 Codex CLI / hermes-agent 相同的设备码流程，通过 ChatGPT Codex 后端调用订阅账号可用的模型。访问令牌和刷新令牌只保存在 `chrome.storage.local` 的独立条目中，不进入配置导出。油猴脚本版不包含此 provider，因为它当前的 GM 请求层不支持所需的流式 SSE 响应。
 
 ## 编写站点规则
 

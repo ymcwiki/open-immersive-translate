@@ -3,7 +3,7 @@ import { TranslateError, type TranslationStreamOptions } from "./base";
 export async function readSse(
   response: Response,
   serviceId: string,
-  onData: (data: string) => string | undefined,
+  onData: (data: string, eventType?: string) => string | undefined,
   options?: TranslationStreamOptions,
 ): Promise<string> {
   if (!response.body) {
@@ -19,13 +19,18 @@ export async function readSse(
   let result = "";
 
   const consume = async (event: string): Promise<void> => {
+    const eventType = event
+      .split(/\r?\n/)
+      .find((line) => line.startsWith("event:"))
+      ?.slice(6)
+      .trim();
     const data = event
       .split(/\r?\n/)
       .filter((line) => line.startsWith("data:"))
       .map((line) => line.slice(5).trimStart())
       .join("\n");
     if (!data || data === "[DONE]") return;
-    const delta = onData(data);
+    const delta = onData(data, eventType || undefined);
     if (delta === undefined) return;
     result += delta;
     await options?.onPartial?.(result);

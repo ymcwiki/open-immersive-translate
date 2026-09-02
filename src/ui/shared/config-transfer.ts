@@ -11,10 +11,17 @@ export function serializeConfig(
   redactApiKeys: boolean,
 ): string {
   const services = Object.fromEntries(
-    Object.entries(config.services).map(([id, service]) => [
-      id,
-      redactApiKeys ? { ...service, apiKey: undefined } : service,
-    ]),
+    Object.entries(config.services).map(([id, service]) => {
+      const copy = { ...service } as Record<string, unknown>;
+      delete copy.accessToken;
+      delete copy.refreshToken;
+      delete copy.idToken;
+      delete copy.access_token;
+      delete copy.refresh_token;
+      delete copy.id_token;
+      if (redactApiKeys) delete copy.apiKey;
+      return [id, copy];
+    }),
   );
   return JSON.stringify({ ...config, services }, null, 2);
 }
