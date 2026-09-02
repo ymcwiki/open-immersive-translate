@@ -1,1 +1,161 @@
-/* TODO(phase1:render): Add translation themes using imt-scoped CSS variables. */
+:root,
+:host {
+  --imt-target-color: #265ea8;
+  --imt-target-font: inherit;
+  --imt-highlight-bg: #fff0a8;
+  --imt-paper-bg: #f7f4ea;
+  --imt-muted-color: #697386;
+  --imt-divider-color: #c7cdd6;
+  --imt-marker-color: rgb(255 224 92 / 55%);
+}
+
+.imt-target {
+  box-sizing: border-box !important;
+  color: var(--imt-target-color, inherit) !important;
+  font-family: var(--imt-target-font, inherit) !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+.imt-source-hidden {
+  display: none !important;
+}
+
+.imt-theme-none {
+  text-decoration: none !important;
+}
+
+.imt-theme-underline {
+  text-decoration: underline !important;
+  text-underline-offset: 0.16em;
+}
+
+.imt-theme-dashed,
+.imt-theme-dotted {
+  border-bottom: 1px dashed currentColor !important;
+}
+
+.imt-theme-dotted {
+  border-bottom-style: dotted !important;
+}
+
+.imt-theme-highlight {
+  background: var(--imt-highlight-bg) !important;
+  border-radius: 0.15em;
+  padding-inline: 0.1em;
+}
+
+.imt-theme-mask {
+  filter: blur(0.32em);
+  transition: filter 120ms ease;
+}
+
+.imt-theme-mask:hover,
+.imt-theme-mask:focus-within {
+  filter: none;
+}
+
+.imt-theme-opacity {
+  opacity: 0.62;
+  transition: opacity 120ms ease;
+}
+
+.imt-theme-opacity:hover {
+  opacity: 1;
+}
+
+.imt-theme-blockquote {
+  display: block !important;
+  border-inline-start: 3px solid currentColor !important;
+  margin-block: 0.45em !important;
+  padding-inline-start: 0.75em !important;
+}
+
+.imt-theme-paper {
+  display: block !important;
+  background: var(--imt-paper-bg) !important;
+  border-radius: 0.28em;
+  margin-block: 0.45em !important;
+  padding: 0.55em 0.7em !important;
+}
+
+.imt-theme-bold {
+  font-weight: 700 !important;
+}
+
+.imt-theme-italic {
+  font-style: italic !important;
+}
+
+.imt-theme-grey {
+  color: var(--imt-muted-color) !important;
+}
+
+.imt-theme-dividingLine {
+  display: block !important;
+  border-top: 1px solid var(--imt-divider-color) !important;
+  margin-top: 0.55em !important;
+  padding-top: 0.45em !important;
+}
+
+.imt-theme-wavy {
+  text-decoration-line: underline !important;
+  text-decoration-style: wavy !important;
+  text-underline-offset: 0.16em;
+}
+
+.imt-theme-marker {
+  background: linear-gradient(
+    transparent 55%,
+    var(--imt-marker-color) 55%,
+    var(--imt-marker-color) 92%,
+    transparent 92%
+  ) !important;
+}
+
+.imt-loading::after {
+  display: inline-block;
+  min-width: 1.2em;
+  animation: imt-loading-dots 1s steps(4, end) infinite;
+  content: "…";
+  overflow: hidden;
+  vertical-align: bottom;
+}
+
+.imt-error {
+  color: #b42318 !important;
+}
+
+.imt-retry {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85em;
+  line-height: 1;
+  padding: 0 0.2em;
+}
+
+@keyframes imt-loading-dots {
+  0% {
+    width: 0;
+  }
+
+  100% {
+    width: 1.2em;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root,
+  :host {
+    --imt-target-color: #8fbcff;
+    --imt-highlight-bg: #66591a;
+    --imt-paper-bg: #292a2d;
+    --imt-muted-color: #aeb6c2;
+    --imt-divider-color: #59616c;
+    --imt-marker-color: rgb(196 152 0 / 55%);
+  }
+}
