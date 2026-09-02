@@ -78,24 +78,24 @@
 |---|---|---|---|
 | D1 | OpenAI 兼容通用适配器（YAML id 合批） | ✅ | 1 |
 | D2 | Claude 原生 | ✅ | 1 |
-| D3 | Gemini 原生 | ⬜ | 3 |
+| D3 | Gemini 原生 | ✅ | 3 |
 | D4 | Google 免费接口 | ✅ | 1 |
-| D5 | Bing/Edge 免费接口（auth token） | ⬜ | 3 |
-| D6 | Microsoft Azure Translator（key） | ⬜ | 3 |
-| D7 | DeepL 官方 API | ⬜ | 3 |
+| D5 | Bing/Edge 免费接口（auth token） | ✅ | 3 |
+| D6 | Microsoft Azure Translator（key） | ✅ | 3 |
+| D7 | DeepL 官方 API | ✅ | 3 |
 | D8 | DeepLX | ✅ | 1 |
-| D9 | 火山引擎 / 腾讯 / 百度 / 有道 / 彩云 / 阿里 | ⬜ | 3 |
-| D10 | Papago / Yandex / Transmart / NiuTrans / OpenL | ⬜ | 3 |
-| D11 | Azure OpenAI | ⬜ | 3 |
-| D12 | 预设：DeepSeek/Qwen/Kimi/智谱/SiliconCloud/Groq/OpenRouter/Grok/Ollama/Mistral/豆包/混元/零一/StepFun/千帆 | ⬜ | 3 |
+| D9 | 火山引擎 / 腾讯 / 百度 / 有道 / 彩云 / 阿里 | ✅ | 3 |
+| D10 | Papago / Yandex / Transmart / NiuTrans / OpenL | ✅ | 3 |
+| D11 | Azure OpenAI | ✅ | 3 |
+| D12 | 预设：DeepSeek/Qwen/Kimi/智谱/SiliconCloud/Groq/OpenRouter/Grok/Ollama/Mistral/豆包/混元/零一/StepFun/千帆/MiniMax | ✅ | 3 |
 | D13 | 自定义 HTTP 服务（模板 + JSON path） | ✅ | 1 |
-| D14 | 自定义 prompt（system/user 模板变量） | 🔧 | 3 |
-| D15 | 每服务模型列表 + 自定义模型名 | ⬜ | 3 |
+| D14 | 自定义 prompt（system/user 模板变量） | ✅ | 3 |
+| D15 | 每服务模型列表 + 自定义模型名 | ✅ | 3 |
 | D16 | 拒答识别（ignoreResRegexs） | ✅ | 1 |
 | D17 | 测试连接 | 🔧 | 2 |
 | D18 | 并发/限流/批大小/超时可配 | ✅ | 1 |
-| D19 | 流式（streaming）译文 | ⬜ | 3 |
-| D20 | 语言对支持检查（不支持自动换服务） | ⬜ | 3 |
+| D19 | 流式（streaming）译文 | ✅ | 3 |
+| D20 | 语言对支持检查（不支持自动换服务） | ✅ | 3 |
 
 ## E. 视频字幕
 | # | 功能 | 状态 | 阶段 |

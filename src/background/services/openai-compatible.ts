@@ -1,22 +1,22 @@
-import type {
-  GlossaryEntry,
-  RateLimit,
-  TranslateRequest,
-} from "../../shared/types";
+import type { RateLimit, TranslateRequest } from "../../shared/types";
 import {
   BaseService,
   type ServiceTranslateResult,
+  type TranslationStreamOptions,
   TranslateError,
   fetchWithTimeout,
   parseJsonResponse,
   responseError,
 } from "./base";
+import {
+  DEFAULT_PROMPTS,
+  renderPromptTemplate,
+  requestPromptVariant,
+} from "./prompts";
+import { readSse } from "./stream";
 
-export const DEFAULT_SYSTEM_PROMPT = `You are a professional translation engine. Translate the input from {{from}} to {{to}}.
-Return only a YAML list with exactly the same ids and item count as the input. Preserve HTML tags and their positions. Do not translate proper nouns or code.
-Page title: {{title}}
-Glossary:
-{{glossary}}`;
+export const DEFAULT_SYSTEM_PROMPT = DEFAULT_PROMPTS.default.system;
+export const DEFAULT_USER_PROMPT = DEFAULT_PROMPTS.default.user;
 
 const DEFAULT_REFUSAL_PATTERNS = [
   String.raw`抱歉[^\n]*(?:无法|不能)[^\n]*翻译`,
@@ -32,12 +32,15 @@ export interface OpenAICompatibleServiceOptions {
   apiPath?: string;
   model?: string;
   prompt?: string;
+  promptSystem?: string;
+  promptUser?: string;
   temperature?: number;
   maxTokens?: number;
   headers?: Record<string, string>;
   extraHeaders?: Record<string, string>;
   ignoreResRegexs?: string[];
   timeoutMs?: number;
+  stream?: boolean;
   maxBatchSize?: number;
   maxBatchChars?: number;
   rateLimit?: Partial<RateLimit>;
@@ -163,30 +166,12 @@ export function parseYamlBatch(content: string): Map<number, string> {
   return parsed;
 }
 
-function glossaryText(glossary: readonly GlossaryEntry[] | undefined): string {
-  if (!glossary?.length) return "(none)";
-  return glossary.map(({ k, v }) => `${k}: ${v}`).join("\n");
-}
-
-/** Fill the four supported system-prompt variables. */
+/** Fill the supported prompt variables for backward-compatible callers. */
 export function renderSystemPrompt(
   template: string,
   request: TranslateRequest,
 ): string {
-  const variables: Record<string, string> = {
-    from: request.from,
-    to: request.to,
-    title: request.context?.title ?? "",
-    glossary: glossaryText(request.glossary),
-  };
-  let prompt = template.replace(
-    /{{(from|to|title|glossary)}}/g,
-    (_, key: keyof typeof variables) => variables[key],
-  );
-  if (request.context?.summary) {
-    prompt += `\nPage summary: ${request.context.summary}`;
-  }
-  return prompt;
+  return renderPromptTemplate(template, request, "");
 }
 
 function joinUrl(baseUrl: string, apiPath: string): string {
@@ -199,12 +184,14 @@ export class OpenAICompatibleService extends BaseService {
   private readonly baseUrl: string;
   private readonly apiPath: string;
   private readonly model: string;
-  private readonly prompt: string;
+  private readonly promptSystem?: string;
+  private readonly promptUser?: string;
   private readonly temperature?: number;
   private readonly maxTokens?: number;
   private readonly headers: Record<string, string>;
   private readonly refusalPatterns: RegExp[];
   private readonly timeoutMs: number;
+  private readonly stream: boolean;
 
   constructor(options: OpenAICompatibleServiceOptions = {}) {
     super({
@@ -222,17 +209,20 @@ export class OpenAICompatibleService extends BaseService {
     this.baseUrl = options.baseUrl ?? "https://api.openai.com/v1";
     this.apiPath = options.apiPath ?? "/chat/completions";
     this.model = options.model ?? "gpt-4o-mini";
-    this.prompt = options.prompt ?? DEFAULT_SYSTEM_PROMPT;
+    this.promptSystem = options.promptSystem ?? options.prompt;
+    this.promptUser = options.promptUser;
     this.temperature = options.temperature;
     this.maxTokens = options.maxTokens;
     this.headers = { ...options.headers, ...options.extraHeaders };
     this.refusalPatterns = buildRefusalPatterns(options.ignoreResRegexs);
     this.timeoutMs = options.timeoutMs ?? 30_000;
+    this.stream = options.stream ?? false;
   }
 
   async translate(
     request: TranslateRequest,
     signal: AbortSignal,
+    options?: TranslationStreamOptions,
   ): Promise<ServiceTranslateResult> {
     if (!request.texts.length) return { texts: [] };
 
@@ -241,12 +231,30 @@ export class OpenAICompatibleService extends BaseService {
       ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
       ...this.headers,
     };
+    const batch = buildYamlBatch(request.texts);
+    const variant = requestPromptVariant(request);
+    const templates = DEFAULT_PROMPTS[variant];
     const body = {
       model: this.model,
       messages: [
-        { role: "system", content: renderSystemPrompt(this.prompt, request) },
-        { role: "user", content: buildYamlBatch(request.texts) },
+        {
+          role: "system",
+          content: renderPromptTemplate(
+            this.promptSystem ?? templates.system,
+            request,
+            batch,
+          ),
+        },
+        {
+          role: "user",
+          content: renderPromptTemplate(
+            this.promptUser ?? templates.user,
+            request,
+            batch,
+          ),
+        },
       ],
+      ...(this.stream ? { stream: true } : {}),
       ...(this.temperature !== undefined
         ? { temperature: this.temperature }
         : {}),
@@ -261,8 +269,37 @@ export class OpenAICompatibleService extends BaseService {
     );
     if (!response.ok) throw await responseError(response, this.id);
 
-    const data = (await parseJsonResponse(response, this.id)) as OpenAIResponse;
-    const content = data.choices?.[0]?.message?.content;
+    let data: OpenAIResponse = {};
+    let content: unknown;
+    if (this.stream) {
+      content = await readSse(
+        response,
+        this.id,
+        (event) => {
+          try {
+            const chunk = JSON.parse(event) as {
+              choices?: Array<{ delta?: { content?: unknown } }>;
+            };
+            const delta = chunk.choices?.[0]?.delta?.content;
+            return typeof delta === "string" ? delta : undefined;
+          } catch (error) {
+            throw new TranslateError(
+              "parse",
+              "OpenAI stream returned invalid JSON.",
+              {
+                serviceId: this.id,
+                retryable: false,
+                cause: error,
+              },
+            );
+          }
+        },
+        options,
+      );
+    } else {
+      data = (await parseJsonResponse(response, this.id)) as OpenAIResponse;
+      content = data.choices?.[0]?.message?.content;
+    }
     if (typeof content !== "string") {
       throw new TranslateError(
         "parse",

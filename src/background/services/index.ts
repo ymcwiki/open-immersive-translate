@@ -4,10 +4,14 @@ import { DeepLXService } from "./deeplx";
 import { GoogleService } from "./google";
 import { OpenAICompatibleService } from "./openai-compatible";
 import { MockService } from "./mock";
-import type { TranslationService } from "./base";
+import { TranslateError, type TranslationService } from "./base";
 import type { ServiceConfig } from "../../shared/types";
+import { createPhase3Service, registerPhase3Services } from "./phase3";
+export { getModels, serviceFields } from "./service-fields";
+export { DEFAULT_PROMPTS } from "./prompts";
+export { OPENAI_PROVIDER_PRESETS } from "./presets";
 
-const services: readonly TranslationService[] = [
+const services: TranslationService[] = [
   new OpenAICompatibleService(),
   new ClaudeService(),
   new GoogleService(),
@@ -28,11 +32,23 @@ export function listServices(): readonly TranslationService[] {
   return [...services];
 }
 
+/** Add phase-3 adapters to the registry. Safe to call more than once. */
+export function initTranslationServices(): void {
+  registerPhase3Services((service) => {
+    if (servicesById.has(service.id)) return;
+    services.push(service);
+    servicesById.set(service.id, service);
+  });
+}
+
 /** Build an adapter from persisted settings while preserving its configured id. */
 export function createService(
   id: string,
   config: ServiceConfig,
 ): TranslationService {
+  const phase3Service = createPhase3Service(id, config);
+  if (phase3Service) return phase3Service;
+
   const common = {
     id,
     apiKey: config.apiKey,
@@ -88,5 +104,11 @@ export function createService(
         maxBatchChars: config.maxBatchChars,
         rateLimit: config.rateLimit,
       });
+    default:
+      throw new TranslateError(
+        "invalid_config",
+        `Unknown translation service kind: ${String(config.kind)}.`,
+        { serviceId: id, retryable: false },
+      );
   }
 }

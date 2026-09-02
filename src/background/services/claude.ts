@@ -2,6 +2,7 @@ import type { RateLimit, TranslateRequest } from "../../shared/types";
 import {
   BaseService,
   type ServiceTranslateResult,
+  type TranslationStreamOptions,
   TranslateError,
   fetchWithTimeout,
   parseJsonResponse,
@@ -10,11 +11,15 @@ import {
 import {
   buildRefusalPatterns,
   buildYamlBatch,
-  DEFAULT_SYSTEM_PROMPT,
   matchesRefusal,
   parseYamlBatch,
-  renderSystemPrompt,
 } from "./openai-compatible";
+import {
+  DEFAULT_PROMPTS,
+  renderPromptTemplate,
+  requestPromptVariant,
+} from "./prompts";
+import { readSse } from "./stream";
 
 export interface ClaudeServiceOptions {
   id?: string;
@@ -24,11 +29,14 @@ export interface ClaudeServiceOptions {
   apiPath?: string;
   model?: string;
   prompt?: string;
+  promptSystem?: string;
+  promptUser?: string;
   temperature?: number;
   maxTokens?: number;
   headers?: Record<string, string>;
   ignoreResRegexs?: string[];
   timeoutMs?: number;
+  stream?: boolean;
   maxBatchSize?: number;
   maxBatchChars?: number;
   rateLimit?: Partial<RateLimit>;
@@ -45,12 +53,14 @@ export class ClaudeService extends BaseService {
   private readonly baseUrl: string;
   private readonly apiPath: string;
   private readonly model: string;
-  private readonly prompt: string;
+  private readonly promptSystem?: string;
+  private readonly promptUser?: string;
   private readonly temperature?: number;
   private readonly maxTokens: number;
   private readonly headers: Record<string, string>;
   private readonly refusalPatterns: RegExp[];
   private readonly timeoutMs: number;
+  private readonly stream: boolean;
 
   constructor(options: ClaudeServiceOptions = {}) {
     super({
@@ -68,21 +78,26 @@ export class ClaudeService extends BaseService {
     this.baseUrl = options.baseUrl ?? "https://api.anthropic.com/v1";
     this.apiPath = options.apiPath ?? "/messages";
     this.model = options.model ?? "claude-3-5-sonnet-latest";
-    this.prompt = options.prompt ?? DEFAULT_SYSTEM_PROMPT;
+    this.promptSystem = options.promptSystem ?? options.prompt;
+    this.promptUser = options.promptUser;
     this.temperature = options.temperature;
     this.maxTokens = options.maxTokens ?? 4096;
     this.headers = options.headers ?? {};
     this.refusalPatterns = buildRefusalPatterns(options.ignoreResRegexs);
     this.timeoutMs = options.timeoutMs ?? 30_000;
+    this.stream = options.stream ?? false;
   }
 
   async translate(
     request: TranslateRequest,
     signal: AbortSignal,
+    options?: TranslationStreamOptions,
   ): Promise<ServiceTranslateResult> {
     if (!request.texts.length) return { texts: [] };
 
     const url = `${this.baseUrl.replace(/\/+$/, "")}/${this.apiPath.replace(/^\/+/, "")}`;
+    const batch = buildYamlBatch(request.texts);
+    const templates = DEFAULT_PROMPTS[requestPromptVariant(request)];
     const response = await fetchWithTimeout(
       url,
       {
@@ -96,8 +111,22 @@ export class ClaudeService extends BaseService {
         body: JSON.stringify({
           model: this.model,
           max_tokens: this.maxTokens,
-          system: renderSystemPrompt(this.prompt, request),
-          messages: [{ role: "user", content: buildYamlBatch(request.texts) }],
+          system: renderPromptTemplate(
+            this.promptSystem ?? templates.system,
+            request,
+            batch,
+          ),
+          messages: [
+            {
+              role: "user",
+              content: renderPromptTemplate(
+                this.promptUser ?? templates.user,
+                request,
+                batch,
+              ),
+            },
+          ],
+          ...(this.stream ? { stream: true } : {}),
           ...(this.temperature !== undefined
             ? { temperature: this.temperature }
             : {}),
@@ -109,13 +138,46 @@ export class ClaudeService extends BaseService {
     );
     if (!response.ok) throw await responseError(response, this.id);
 
-    const data = (await parseJsonResponse(response, this.id)) as ClaudeResponse;
-    const content = data.content
-      ?.filter(
-        (block) => block.type === "text" && typeof block.text === "string",
-      )
-      .map((block) => block.text as string)
-      .join("\n");
+    let data: ClaudeResponse = {};
+    let content: string | undefined;
+    if (this.stream) {
+      content = await readSse(
+        response,
+        this.id,
+        (event) => {
+          try {
+            const chunk = JSON.parse(event) as {
+              type?: string;
+              delta?: { type?: string; text?: unknown };
+            };
+            return chunk.type === "content_block_delta" &&
+              chunk.delta?.type === "text_delta" &&
+              typeof chunk.delta.text === "string"
+              ? chunk.delta.text
+              : undefined;
+          } catch (error) {
+            throw new TranslateError(
+              "parse",
+              "Claude stream returned invalid JSON.",
+              {
+                serviceId: this.id,
+                retryable: false,
+                cause: error,
+              },
+            );
+          }
+        },
+        options,
+      );
+    } else {
+      data = (await parseJsonResponse(response, this.id)) as ClaudeResponse;
+      content = data.content
+        ?.filter(
+          (block) => block.type === "text" && typeof block.text === "string",
+        )
+        .map((block) => block.text as string)
+        .join("\n");
+    }
     if (!content) {
       throw new TranslateError(
         "parse",
