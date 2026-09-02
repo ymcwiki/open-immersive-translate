@@ -10,10 +10,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const browserMock = vi.hoisted(() => ({
   runtime: {
     openOptionsPage: vi.fn(),
+    sendMessage: vi.fn(),
+    getURL: vi.fn((path: string) => `chrome-extension://test/${path}`),
   },
   tabs: {
     query: vi.fn(),
     sendMessage: vi.fn(),
+    create: vi.fn(),
   },
   storage: {
     local: {
@@ -38,8 +41,11 @@ let stored: Config;
 beforeEach(() => {
   stored = structuredClone(DEFAULT_CONFIG);
   browserMock.runtime.openOptionsPage.mockReset();
+  browserMock.runtime.sendMessage.mockReset().mockResolvedValue({ cleared: 4 });
+  browserMock.runtime.getURL.mockClear();
   browserMock.tabs.query.mockReset();
   browserMock.tabs.sendMessage.mockReset();
+  browserMock.tabs.create.mockReset().mockResolvedValue(undefined);
   browserMock.storage.local.get.mockReset();
   browserMock.storage.local.set.mockReset();
   browserMock.storage.onChanged.addListener.mockReset();
@@ -65,9 +71,9 @@ describe("Popup", () => {
 
     const toggle = await screen.findByRole("button", { name: "翻译" });
     await screen.findByText("example.com");
-    expect(
-      (screen.getByLabelText("翻译服务") as HTMLSelectElement).value,
-    ).toBe("google");
+    expect((screen.getByLabelText("翻译服务") as HTMLSelectElement).value).toBe(
+      "google",
+    );
     expect(stored.services.google).toMatchObject({
       kind: "google",
       enabled: true,
@@ -106,6 +112,28 @@ describe("Popup", () => {
     await waitFor(() => {
       expect(stored.alwaysTranslateSites).toEqual(["example.com"]);
       expect(stored.neverTranslateSites).toEqual([]);
+    });
+  });
+
+  it("opens the more-menu destinations and clears the cache", async () => {
+    render(<Popup />);
+    await screen.findByRole("button", { name: "翻译" });
+    fireEvent.click(screen.getByRole("button", { name: "更多" }));
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "清除缓存" }));
+    await screen.findByText("已清除 4 条缓存");
+    expect(browserMock.runtime.sendMessage).toHaveBeenCalledWith({
+      type: "clearCache",
+    });
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "翻译本地 PDF" }));
+    expect(browserMock.tabs.create).toHaveBeenCalledWith({
+      url: "chrome-extension://test/src/pdf/index.html",
+    });
+    fireEvent.click(screen.getByRole("menuitem", { name: "打开侧边栏" }));
+    expect(browserMock.runtime.sendMessage).toHaveBeenCalledWith({
+      type: "openSidePanel",
+      tabId: 42,
     });
   });
 });

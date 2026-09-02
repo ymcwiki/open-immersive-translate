@@ -1,12 +1,13 @@
 import { configSchema } from "../../shared/config";
+import { withKDefaults, type KConfig } from "../../shared/k-types";
 import type { Config } from "../../shared/types";
 
 export type ConfigImportResult =
-  | { ok: true; config: Config }
+  | { ok: true; config: KConfig }
   | { ok: false; reason: "invalid-json" | "invalid-schema" };
 
 export function serializeConfig(
-  config: Config,
+  config: Config | KConfig,
   redactApiKeys: boolean,
 ): string {
   const services = Object.fromEntries(
@@ -28,6 +29,6 @@ export function parseConfigImport(text: string): ConfigImportResult {
 
   const parsed = configSchema.safeParse(value);
   return parsed.success
-    ? { ok: true, config: parsed.data }
+    ? { ok: true, config: withKDefaults(value) }
     : { ok: false, reason: "invalid-schema" };
 }

@@ -3,11 +3,17 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import browser from "webextension-polyfill";
 
 import { LANGUAGE_CODES } from "../../shared/lang";
-import { sendToBackground, sendToTab } from "../../shared/messages";
+import { sendToTab } from "../../shared/messages";
 import type { LangCode, TranslationMode } from "../../shared/types";
 import { Button, Field, Select, Toggle } from "../shared/components";
-import { languageName, serviceName, t } from "../shared/i18n";
-import { useConfig } from "../shared/use-config";
+import {
+  languageName,
+  serviceName,
+  setUiLocaleOverride,
+  t,
+} from "../shared/i18n";
+import { useKConfig } from "../shared/k-config";
+import { clearCache } from "../shared/runtime";
 import "../shared/styles.css";
 import "./popup.css";
 
@@ -17,10 +23,12 @@ interface ActiveTab {
 }
 
 export function Popup(): preact.JSX.Element {
-  const { config, error, updateConfig } = useConfig();
+  const { config, error, updateConfig } = useKConfig();
   const [activeTab, setActiveTab] = useState<ActiveTab>({});
   const [translated, setTranslated] = useState(false);
   const [toggleError, setToggleError] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [menuStatus, setMenuStatus] = useState<string>();
 
   useEffect(() => {
     void getActiveTab().then(setActiveTab).catch(console.error);
@@ -44,6 +52,8 @@ export function Popup(): preact.JSX.Element {
       </main>
     );
   }
+
+  setUiLocaleOverride(config.uiLanguage);
 
   const hostname = activeTab.hostname;
   const always = hostname
@@ -187,12 +197,68 @@ export function Popup(): preact.JSX.Element {
       )}
 
       <footer class="popup-footer">
-        <button
-          type="button"
-          onClick={() => void sendToBackground({ type: "openOptions" })}
-        >
-          {t("popup.settings")}
-        </button>
+        <div class="popup-more">
+          <button
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen((open) => !open)}
+          >
+            {t("popup.more")}
+          </button>
+          {moreOpen && (
+            <div class="popup-more-menu" role="menu">
+              <MenuButton
+                label={t("popup.settings")}
+                onClick={() => void browser.runtime.openOptionsPage()}
+              />
+              <MenuButton
+                label={t("popup.shortcuts")}
+                onClick={() =>
+                  void browser.tabs.create({
+                    url: "chrome://extensions/shortcuts",
+                  })
+                }
+              />
+              <MenuButton
+                label={t("popup.clearCache")}
+                onClick={() => {
+                  void clearCache()
+                    .then((count) =>
+                      setMenuStatus(
+                        count === undefined
+                          ? t("data.cacheClearFailed")
+                          : t("popup.cacheCleared", { count }),
+                      ),
+                    )
+                    .catch(() => setMenuStatus(t("data.cacheClearFailed")));
+                }}
+              />
+              <MenuButton
+                label={t("popup.feedback")}
+                onClick={() =>
+                  void browser.tabs.create({
+                    url: "https://github.com/example/bilingual-translator/issues",
+                  })
+                }
+              />
+              <MenuButton
+                label={t("popup.openSidePanel")}
+                onClick={() => void openSidePanel(activeTab.id)}
+              />
+              <MenuButton
+                label={t("popup.translatePdf")}
+                onClick={() => void openExtensionPage("src/pdf/index.html")}
+              />
+              <MenuButton
+                label={t("popup.translateSubtitle")}
+                onClick={() =>
+                  void openExtensionPage("src/subtitle-file/index.html")
+                }
+              />
+            </div>
+          )}
+        </div>
         <span>
           {t("popup.shortcut", {
             shortcut:
@@ -200,8 +266,47 @@ export function Popup(): preact.JSX.Element {
           })}
         </span>
       </footer>
+      {menuStatus && (
+        <p role="status" class="ui-status">
+          {menuStatus}
+        </p>
+      )}
     </main>
   );
+}
+
+function MenuButton({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}): preact.JSX.Element {
+  return (
+    <button type="button" role="menuitem" onClick={onClick}>
+      {label}
+    </button>
+  );
+}
+
+async function openExtensionPage(path: string): Promise<void> {
+  await browser.tabs.create({ url: browser.runtime.getURL(path) });
+}
+
+async function openSidePanel(tabId: number | undefined): Promise<void> {
+  if (tabId === undefined) return;
+  const sidePanel = (
+    globalThis as unknown as {
+      chrome?: {
+        sidePanel?: { open(options: { tabId: number }): Promise<void> };
+      };
+    }
+  ).chrome?.sidePanel;
+  if (sidePanel) {
+    await sidePanel.open({ tabId });
+    return;
+  }
+  await browser.runtime.sendMessage({ type: "openSidePanel", tabId });
 }
 
 async function getActiveTab(): Promise<ActiveTab> {

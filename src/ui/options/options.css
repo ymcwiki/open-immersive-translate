@@ -224,6 +224,18 @@ body {
   line-height: 1.5;
 }
 
+.rules-editor-short {
+  min-height: 180px;
+}
+
+.options-inline-toggles {
+  margin: 14px 0;
+}
+
+.json-invalid {
+  border-color: var(--ui-danger) !important;
+}
+
 .glossary-header,
 .glossary-row {
   display: grid;

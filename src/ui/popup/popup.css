@@ -102,3 +102,32 @@ body {
   cursor: pointer;
   background: transparent;
 }
+
+.popup-more {
+  position: relative;
+}
+
+.popup-more-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 10;
+  display: grid;
+  width: 210px;
+  padding: 6px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-panel);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 18%);
+}
+
+.popup-more-menu button {
+  padding: 8px 9px;
+  border-radius: 6px;
+  color: var(--ui-text);
+  text-align: left;
+}
+
+.popup-more-menu button:hover {
+  background: var(--ui-panel-muted);
+}

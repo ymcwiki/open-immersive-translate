@@ -5,6 +5,7 @@ import {
   init,
   isTripleSpaceTrigger,
   parseTranslationInput,
+  resolveAutoTargetLanguage,
 } from "../../src/content/features/input-translate";
 
 function context(
@@ -106,6 +107,69 @@ describe("input translation", () => {
     expect(confirm).toHaveBeenCalledOnce();
     expect(translateText).not.toHaveBeenCalled();
     expect(input.disabled).toBe(false);
+    dispose();
+  });
+
+  it("resolves configurable aliases and automatic Chinese/English targets", async () => {
+    expect(
+      parseTranslationInput("/jp こんにちは", "en", { ja: ["jp"] }),
+    ).toEqual({ text: "こんにちは", targetLanguage: "ja" });
+    expect(resolveAutoTargetLanguage("你好")).toBe("en");
+    expect(resolveAutoTargetLanguage("hello")).toBe("zh-CN");
+
+    const input = document.createElement("textarea");
+    input.value = "//你好";
+    document.body.append(input);
+    const translateText = vi.fn().mockResolvedValue("hello");
+    const dispose = init({
+      ...context(translateText),
+      config: {
+        sourceLanguage: "auto",
+        targetLanguage: "zh-CN",
+        input: { enabled: true, autoTargetLanguage: true },
+      } as unknown as FeatureContext["config"],
+    });
+    input.dispatchEvent(new InputEvent("input", { bubbles: true }));
+    expect(document.querySelector('[data-imt="input-target"]')).not.toBeNull();
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }),
+    );
+    await vi.waitFor(() => expect(input.value).toBe("hello"));
+    expect(translateText).toHaveBeenCalledWith("你好", "auto", "en");
+    dispose();
+  });
+
+  it("uses a configurable trailing key, repeat count, and timeout", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const input = document.createElement("input");
+    input.value = "hello";
+    document.body.append(input);
+    const translateText = vi.fn().mockResolvedValue("你好");
+    const dispose = init({
+      ...context(translateText),
+      config: {
+        sourceLanguage: "auto",
+        input: {
+          enabled: true,
+          triggerMode: "trailing",
+          trailingTriggerKey: ".",
+          trailingTriggerCount: 2,
+          trailingTriggerTimeoutMs: 500,
+        },
+      } as unknown as FeatureContext["config"],
+    });
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: "." }),
+    );
+    input.value = "hello.";
+    vi.advanceTimersByTime(300);
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: "." }),
+    );
+    await Promise.resolve();
+
+    expect(translateText).toHaveBeenCalledWith("hello", "auto", "en");
     dispose();
   });
 });
