@@ -101,14 +101,14 @@
 | # | 功能 | 状态 | 阶段 |
 |---|---|---|---|
 | E1 | YouTube 字幕拦截 + 双语 | ✅ | 1 |
-| E2 | 自绘字幕层（字号/颜色/背景/位置） | ⬜ | 3 |
-| E3 | 字幕预翻译开关 + 快捷键 | ⬜ | 3 |
-| E4 | Netflix / Prime Video / Disney+ / HBO Max / Hulu | ⬜ | 3 |
-| E5 | Coursera / Udemy / edX / Khan / TED / Vimeo / LinkedIn Learning | ⬜ | 3 |
-| E6 | Bilibili / Twitter Spaces / Facebook / Dailymotion | ⬜ | 3 |
-| E7 | 通用 `<track>` / WebVTT 字幕站点自动支持 | ⬜ | 3 |
-| E8 | 本地字幕文件（srt/vtt/ass）翻译页 | ⬜ | 3 |
-| E9 | 字幕样式：双语/仅译文/仅原文 | ⬜ | 3 |
+| E2 | 自绘字幕层（字号/颜色/背景/位置） | ✅ | 3 |
+| E3 | 字幕预翻译开关 + 快捷键 | ✅ | 3 |
+| E4 | Netflix / Prime Video / Disney+ / HBO Max / Hulu | ✅ | 3 |
+| E5 | Coursera / Udemy / edX / Khan / TED / Vimeo / LinkedIn Learning | ✅ | 3 |
+| E6 | Bilibili / Twitter Spaces / Facebook / Dailymotion | ✅ | 3 |
+| E7 | 通用 `<track>` / WebVTT 字幕站点自动支持 | ✅ | 3 |
+| E8 | 本地字幕文件（srt/vtt/ass）翻译页 | ✅ | 3 |
+| E9 | 字幕样式：双语/仅译文/仅原文 | ✅ | 3 |
 
 ## F. PDF
 | # | 功能 | 状态 | 阶段 |
