@@ -66,6 +66,7 @@ const ruleValidationSchema: z.ZodType<Rule> = z.strictObject({
 
 export interface MatchRuleOptions {
   hasSelector?: (selector: string) => boolean;
+  remoteRules?: readonly Rule[];
 }
 
 export interface RuleValidationResult {
@@ -208,11 +209,19 @@ export function matchRule(
   const matchingBuiltins = builtinRules.filter((rule) =>
     matchesRule(url, rule, options),
   );
+  const matchingRemoteRules = (options.remoteRules ?? []).filter((rule) =>
+    matchesRule(url, rule, options),
+  );
   const matchingUserRules = userRules.filter((rule) =>
     matchesRule(url, rule, options),
   );
 
-  return mergeRules(generalRule, ...matchingBuiltins, ...matchingUserRules);
+  return mergeRules(
+    generalRule,
+    ...matchingBuiltins,
+    ...matchingRemoteRules,
+    ...matchingUserRules,
+  );
 }
 
 /** Match rules in a content-script document, including selector-gated rules. */

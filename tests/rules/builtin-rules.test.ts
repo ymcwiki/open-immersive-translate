@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import { builtinRules } from "../../src/background/rules/builtin-rules";
+import { generatedRules } from "../../src/background/rules/builtin-rules/index";
 import { matchRule, validateRule } from "../../src/background/rules/match";
+import type { Rule } from "../../src/shared/types";
 
 describe("builtinRules", () => {
-  it("defines one valid rule for each phase-one site", () => {
-    expect(builtinRules).toHaveLength(10);
-    expect(new Set(builtinRules.map((rule) => rule.id)).size).toBe(10);
+  it("keeps at least 100 generated rules plus the ten hand-written overrides", () => {
+    expect(generatedRules.length).toBeGreaterThanOrEqual(100);
+    expect(builtinRules).toHaveLength(generatedRules.length + 10);
+    expect(new Set(builtinRules.map((rule) => rule.id)).size).toBe(
+      builtinRules.length,
+    );
 
-    for (const rule of builtinRules) {
+    for (const rule of generatedRules as readonly Rule[]) {
       expect(validateRule(rule), rule.id).toEqual({ ok: true, errors: [] });
     }
   });
@@ -24,6 +29,18 @@ describe("builtinRules", () => {
     ["https://export.arxiv.org/abs/2609.00001", "arxiv"],
     ["https://medium.com/publication/story-123", "medium"],
     ["https://www.google.co.uk/search?q=vitest", "google-search"],
+    ["https://developer.mozilla.org/en-US/docs/Web/API", "ported-mdn"],
+    ["https://docs.python.org/3/library/asyncio.html", "ported-python-docs"],
+    ["https://huggingface.co/docs/transformers", "ported-huggingface"],
+    ["https://www.bing.com/search?q=vitest", "ported-bing"],
+    ["https://duckduckgo.com/?q=vitest", "ported-duckduckgo"],
+    ["https://www.nytimes.com/section/world", "ported-nytimes"],
+    ["https://www.nature.com/articles/example", "ported-nature"],
+    ["https://www.amazon.com/dp/example", "ported-amazon"],
+    ["https://chatgpt.com/c/example", "ported-chatgpt"],
+    ["https://claude.ai/new", "ported-claude"],
+    ["https://www.zhihu.com/question/1", "ported-zhihu"],
+    ["https://www.bilibili.com/video/BV1", "ported-bilibili"],
   ])("selects %s as %s", (url, id) => {
     expect(matchRule(url).id).toBe(id);
   });
@@ -65,6 +82,21 @@ describe("builtinRules", () => {
     );
   });
 
+  it("keeps the ten reviewed rules last so they override generated data", () => {
+    expect(builtinRules.slice(-10).map(({ id }) => id)).toEqual([
+      "github",
+      "twitter",
+      "reddit",
+      "youtube",
+      "hacker-news",
+      "stackoverflow",
+      "wikipedia",
+      "arxiv",
+      "medium",
+      "google-search",
+    ]);
+  });
+
   it("uses syntactically valid CSS selectors", () => {
     const selectorFields = [
       "selectorMatches",
@@ -72,14 +104,20 @@ describe("builtinRules", () => {
       "excludeSelectors",
       "additionalExcludeSelectors",
       "stayOriginalSelectors",
+      "additionalStayOriginalSelectors",
       "atomicBlockSelectors",
+      "additionalAtomicBlockSelectors",
       "extraInlineSelectors",
+      "additionalExtraInlineSelectors",
       "extraBlockSelectors",
+      "additionalExtraBlockSelectors",
       "shadowRootSelectors",
+      "additionalShadowRootSelectors",
       "mutationExcludeSelectors",
+      "additionalMutationExcludeSelectors",
     ] as const;
 
-    for (const rule of builtinRules) {
+    for (const rule of generatedRules as readonly Rule[]) {
       for (const field of selectorFields) {
         for (const selector of rule[field] ?? []) {
           expect(

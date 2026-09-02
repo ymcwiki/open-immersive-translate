@@ -198,6 +198,38 @@ describe("matchRule", () => {
       matchRuleInPage("https://example.com/post", rules, document).id,
     ).toBe("article-layout");
   });
+
+  it("merges remote rules after built-ins and before user rules", () => {
+    const remoteRules: Rule[] = [
+      {
+        id: "remote-github",
+        matches: ["*://github.com/*"],
+        selectors: [".remote-prose"],
+        theme: "grey",
+      },
+    ];
+    const userRules: Rule[] = [
+      {
+        id: "user-github",
+        matches: ["*://github.com/*"],
+        additionalExcludeSelectors: [".user-control"],
+        theme: "paper",
+      },
+    ];
+
+    const remoteOnly = matchRule("https://github.com/openai/codex", [], {
+      remoteRules,
+    });
+    expect(remoteOnly.id).toBe("remote-github");
+    expect(remoteOnly.selectors).toEqual([".remote-prose"]);
+
+    const withUser = matchRule("https://github.com/openai/codex", userRules, {
+      remoteRules,
+    });
+    expect(withUser.id).toBe("user-github");
+    expect(withUser.theme).toBe("paper");
+    expect(withUser.excludeSelectors).toContain(".user-control");
+  });
 });
 
 describe("validateRule", () => {

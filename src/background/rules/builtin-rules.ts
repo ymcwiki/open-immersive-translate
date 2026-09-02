@@ -1,4 +1,5 @@
 import type { Rule } from "../../shared/types";
+import { generatedRules } from "./builtin-rules/index";
 
 /** GitHub: translate prose surfaces while leaving repository trees, code, and diffs intact. */
 const github: Rule = {
@@ -282,6 +283,7 @@ const googleSearch: Rule = {
 };
 
 export const builtinRules: readonly Rule[] = [
+  ...generatedRules,
   github,
   twitter,
   reddit,
