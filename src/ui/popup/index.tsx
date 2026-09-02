@@ -13,7 +13,7 @@ import {
   t,
 } from "../shared/i18n";
 import { useKConfig } from "../shared/k-config";
-import { clearCache } from "../shared/runtime";
+import { clearCache, getCacheCount } from "../shared/runtime";
 import "../shared/styles.css";
 import "./popup.css";
 
@@ -223,14 +223,24 @@ export function Popup(): preact.JSX.Element {
               <MenuButton
                 label={t("popup.clearCache")}
                 onClick={() => {
-                  void clearCache()
-                    .then((count) =>
+                  void getCacheCount()
+                    .then(async (count) => {
+                      if (count === undefined) {
+                        setMenuStatus(t("data.cacheClearFailed"));
+                        return;
+                      }
+                      if (
+                        !window.confirm(t("popup.clearCacheConfirm", { count }))
+                      ) {
+                        return;
+                      }
+                      const cleared = await clearCache();
                       setMenuStatus(
-                        count === undefined
+                        cleared === undefined
                           ? t("data.cacheClearFailed")
-                          : t("popup.cacheCleared", { count }),
-                      ),
-                    )
+                          : t("popup.cacheCleared", { count: cleared }),
+                      );
+                    })
                     .catch(() => setMenuStatus(t("data.cacheClearFailed")));
                 }}
               />
@@ -255,6 +265,10 @@ export function Popup(): preact.JSX.Element {
                 onClick={() =>
                   void openExtensionPage("src/subtitle-file/index.html")
                 }
+              />
+              <MenuButton
+                label={t("popup.configTransfer")}
+                onClick={() => void openExtensionPage("options.html#data")}
               />
             </div>
           )}

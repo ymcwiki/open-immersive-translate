@@ -41,7 +41,13 @@ let stored: Config;
 beforeEach(() => {
   stored = structuredClone(DEFAULT_CONFIG);
   browserMock.runtime.openOptionsPage.mockReset();
-  browserMock.runtime.sendMessage.mockReset().mockResolvedValue({ cleared: 4 });
+  browserMock.runtime.sendMessage
+    .mockReset()
+    .mockImplementation(async (message: { type?: string }) => {
+      if (message.type === "getCacheStats") return { count: 4 };
+      if (message.type === "clearCache") return { cleared: 4 };
+      return undefined;
+    });
   browserMock.runtime.getURL.mockClear();
   browserMock.tabs.query.mockReset();
   browserMock.tabs.sendMessage.mockReset();
@@ -61,9 +67,13 @@ beforeEach(() => {
   browserMock.storage.local.set.mockImplementation(async (value) => {
     stored = value.config;
   });
+  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe("Popup", () => {
   it("renders controls, sends the tab toggle, and persists selections", async () => {
@@ -115,17 +125,31 @@ describe("Popup", () => {
     });
   });
 
-  it("opens the more-menu destinations and clears the cache", async () => {
+  it("dispatches every more-menu action and confirms cache clearing", async () => {
     render(<Popup />);
     await screen.findByRole("button", { name: "翻译" });
     fireEvent.click(screen.getByRole("button", { name: "更多" }));
 
     fireEvent.click(screen.getByRole("menuitem", { name: "清除缓存" }));
     await screen.findByText("已清除 4 条缓存");
+    expect(window.confirm).toHaveBeenCalledWith("确认清除 4 条缓存吗？");
+    expect(browserMock.runtime.sendMessage).toHaveBeenCalledWith({
+      type: "getCacheStats",
+    });
     expect(browserMock.runtime.sendMessage).toHaveBeenCalledWith({
       type: "clearCache",
     });
 
+    fireEvent.click(screen.getByRole("menuitem", { name: "设置" }));
+    expect(browserMock.runtime.openOptionsPage).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("menuitem", { name: "快捷键" }));
+    expect(browserMock.tabs.create).toHaveBeenCalledWith({
+      url: "chrome://extensions/shortcuts",
+    });
+    fireEvent.click(screen.getByRole("menuitem", { name: "反馈" }));
+    expect(browserMock.tabs.create).toHaveBeenCalledWith({
+      url: "https://github.com/example/bilingual-translator/issues",
+    });
     fireEvent.click(screen.getByRole("menuitem", { name: "翻译本地 PDF" }));
     expect(browserMock.tabs.create).toHaveBeenCalledWith({
       url: "chrome-extension://test/src/pdf/index.html",
@@ -138,6 +162,24 @@ describe("Popup", () => {
     expect(browserMock.runtime.sendMessage).toHaveBeenCalledWith({
       type: "openSidePanel",
       tabId: 42,
+    });
+    fireEvent.click(screen.getByRole("menuitem", { name: "导出/导入配置" }));
+    expect(browserMock.tabs.create).toHaveBeenCalledWith({
+      url: "chrome-extension://test/options.html#data",
+    });
+  });
+
+  it("does not clear the cache when confirmation is cancelled", async () => {
+    vi.mocked(window.confirm).mockReturnValue(false);
+    render(<Popup />);
+    await screen.findByRole("button", { name: "翻译" });
+    fireEvent.click(screen.getByRole("button", { name: "更多" }));
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "清除缓存" }));
+    await waitFor(() => expect(window.confirm).toHaveBeenCalled());
+
+    expect(browserMock.runtime.sendMessage).not.toHaveBeenCalledWith({
+      type: "clearCache",
     });
   });
 });

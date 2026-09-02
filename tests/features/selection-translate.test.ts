@@ -71,6 +71,48 @@ describe("selection translation", () => {
     dispose();
   });
 
+  it("opens the same panel directly for a context-menu selection", async () => {
+    const ctx: FeatureContext = {
+      config: {
+        sourceLanguage: "en",
+        targetLanguage: "zh-CN",
+        selection: {
+          enabled: true,
+          dictionary: false,
+          triggerMode: "icon-click",
+        },
+      } as unknown as FeatureContext["config"],
+      rule: { matches: ["<all_urls>"] },
+      translateText: vi.fn().mockResolvedValue("选中的文字"),
+      translateParagraph: vi.fn(),
+      toggleTranslate: vi.fn(),
+      isTranslated: vi.fn(),
+    };
+    const dispose = init(ctx);
+
+    const event = new CustomEvent("imt:translate-selection", {
+      cancelable: true,
+      detail: { text: "Selected text" },
+    });
+    expect(document.dispatchEvent(event)).toBe(false);
+
+    const host = document.querySelector<HTMLElement>('[data-imt="selection"]')!;
+    expect(
+      host.shadowRoot!.querySelector<HTMLButtonElement>(".trigger")!.hidden,
+    ).toBe(true);
+    await vi.waitFor(() => {
+      expect(host.shadowRoot!.querySelector(".result")!.textContent).toBe(
+        "选中的文字",
+      );
+    });
+    expect(ctx.translateText).toHaveBeenCalledWith(
+      "Selected text",
+      "en",
+      "zh-CN",
+    );
+    dispose();
+  });
+
   it("renders a structured dictionary directly for a single word", async () => {
     const paragraph = document.createElement("p");
     paragraph.textContent = "hello";

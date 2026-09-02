@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { SubtitleNetworkFormat } from "../../src/shared/subtitle-types";
+import bilibiliFixture from "./fixtures/bilibili-subtitle.json?raw";
+import ttmlFixture from "./fixtures/streaming.ttml?raw";
+import webVttFixture from "./fixtures/captured-captions.vtt?raw";
+
 import {
   matchingSubtitleAdapters,
   SubtitleCaptureHub,
@@ -102,4 +107,86 @@ describe("subtitle adapters", () => {
     });
     expect(cues).toEqual([{ id: "a", start: 1, end: 2, text: "Hello" }]);
   });
+
+  it.each([
+    ["netflix", "https://www.netflix.com/watch/1", "ttml", ttmlFixture],
+    ["primevideo", "https://www.primevideo.com/detail/1", "ttml", ttmlFixture],
+    ["disneyplus", "https://www.disneyplus.com/video/1", "auto", webVttFixture],
+    ["hbomax", "https://play.max.com/video/1", "auto", webVttFixture],
+    ["hulu", "https://www.hulu.com/watch/1", "auto", webVttFixture],
+  ] as const)(
+    "parses a captured streaming fixture for %s",
+    (adapterId, pageUrl, format, body) => {
+      expectCapturedFixture(adapterId, pageUrl, format, body);
+    },
+  );
+
+  it.each([
+    ["coursera", "https://www.coursera.org/learn/test"],
+    ["udemy", "https://www.udemy.com/course/test"],
+    ["edx", "https://courses.edx.org/courses/test"],
+    ["khanacademy", "https://www.khanacademy.org/math"],
+    ["ted", "https://www.ted.com/talks/test"],
+    ["vimeo", "https://vimeo.com/123"],
+    ["linkedin-learning", "https://www.linkedin.com/learning/test"],
+  ] as const)(
+    "parses a captured course fixture for %s",
+    (adapterId, pageUrl) => {
+      expectCapturedFixture(adapterId, pageUrl, "auto", webVttFixture);
+    },
+  );
+
+  it.each([
+    ["twitter", "https://x.com/i/spaces/1"],
+    ["facebook", "https://www.facebook.com/watch/1"],
+    ["dailymotion", "https://www.dailymotion.com/video/1"],
+  ] as const)(
+    "parses a captured social fixture for %s",
+    (adapterId, pageUrl) => {
+      expectCapturedFixture(adapterId, pageUrl, "auto", webVttFixture);
+    },
+  );
+
+  it("parses a captured Bilibili JSON fixture", () => {
+    expectCapturedFixture(
+      "bilibili",
+      "https://www.bilibili.com/video/BV1",
+      "bilibili-json",
+      bilibiliFixture,
+    );
+  });
 });
+
+function expectCapturedFixture(
+  adapterId: string,
+  pageUrl: string,
+  format: SubtitleNetworkFormat,
+  body: string,
+): void {
+  document.body.innerHTML = "<video></video>";
+  const adapter = matchingSubtitleAdapters(pageUrl).find(
+    (candidate) => candidate.id === adapterId,
+  );
+  const hub = new SubtitleCaptureHub();
+  const listener = vi.fn();
+  const unsubscribe = adapter
+    ?.hook({ document, captures: hub })
+    .subscribe(listener);
+
+  hub.emit({
+    adapterId,
+    format,
+    url: `https://media.example.test/${adapterId}/captions`,
+    body,
+  });
+
+  expect(listener).toHaveBeenCalledWith(
+    expect.objectContaining({
+      adapterId,
+      cues: expect.arrayContaining([
+        expect.objectContaining({ start: 1.24, end: 3.88 }),
+      ]),
+    }),
+  );
+  unsubscribe?.();
+}

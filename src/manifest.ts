@@ -103,13 +103,13 @@ export default defineManifest({
     translateWithCustom1: { description: "Translate with Custom 1" },
     translateWithCustom2: { description: "Translate with Custom 2" },
     translateWithCustom3: { description: "Translate with Custom 3" },
-    "translate-input": {
+    translateInputBox: {
       description: "Translate the active input",
     },
-    "toggle-side-panel": {
+    toggleSidePanel: {
       description: "Open the translation side panel",
     },
-    "open-ai-writing": { description: "Open AI writing" },
+    openAiWritingModal: { description: "Open AI writing" },
   },
   side_panel: {
     default_path: "src/ui/sidepanel/index.html",

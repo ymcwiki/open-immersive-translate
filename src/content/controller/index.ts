@@ -45,6 +45,13 @@ function showSelectionTranslation(
   controller: TranslationController,
   text: string,
 ): void {
+  const handled = !document.dispatchEvent(
+    new CustomEvent("imt:translate-selection", {
+      cancelable: true,
+      detail: { text },
+    }),
+  );
+  if (handled) return;
   document.querySelector('[data-imt="context-menu"]')?.remove();
   const host = document.createElement("aside");
   host.dataset.imt = "context-menu";

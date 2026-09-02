@@ -1,3 +1,5 @@
+import browser from "webextension-polyfill";
+
 import { sendToBackground } from "../../shared/messages";
 import type { ServiceTestResult } from "../../shared/messages";
 import type { ServiceConfig } from "../../shared/types";
@@ -19,12 +21,62 @@ export async function testServiceConnection(
     serviceId,
     config,
   });
-  if (!isRecord(response) || typeof response.ok !== "boolean") return undefined;
-  return {
-    ok: response.ok,
-    message:
-      typeof response.message === "string" ? response.message : undefined,
-  };
+  if (
+    !isRecord(response) ||
+    typeof response.ok !== "boolean" ||
+    typeof response.latencyMs !== "number"
+  ) {
+    return undefined;
+  }
+  if (response.ok === true && typeof response.sample === "string") {
+    return {
+      ok: true,
+      latencyMs: response.latencyMs,
+      sample: response.sample,
+    };
+  }
+  if (response.ok === false && typeof response.error === "string") {
+    return {
+      ok: false,
+      latencyMs: response.latencyMs,
+      error: response.error,
+    };
+  }
+  return undefined;
+}
+
+export interface BrowserCommandBinding {
+  name: string;
+  description: string;
+  shortcut: string;
+}
+
+/** Read live bindings because users change them outside extension storage. */
+export async function getBrowserCommandBindings(): Promise<
+  BrowserCommandBinding[]
+> {
+  const commands = (
+    browser as unknown as {
+      commands?: {
+        getAll(): Promise<
+          Array<{ name?: string; description?: string; shortcut?: string }>
+        >;
+      };
+    }
+  ).commands;
+  if (!commands) return [];
+  const values = await commands.getAll();
+  return values.flatMap((value) =>
+    typeof value.name === "string"
+      ? [
+          {
+            name: value.name,
+            description: value.description ?? value.name,
+            shortcut: value.shortcut ?? "",
+          },
+        ]
+      : [],
+  );
 }
 
 export async function getCacheCount(): Promise<number | undefined> {

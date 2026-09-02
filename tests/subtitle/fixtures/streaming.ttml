@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling" xml:lang="en">
+  <head>
+    <styling>
+      <style xml:id="caption" tts:textAlign="center" />
+    </styling>
+  </head>
+  <body>
+    <div>
+      <p xml:id="caption-1" begin="00:00:01.240" end="00:00:03.880" style="caption">
+        <span>Previously on the series,</span><br/><span>the signal disappeared.</span>
+      </p>
+      <p xml:id="caption-2" begin="00:00:04.000" dur="2.5s" style="caption">We have six hours left.</p>
+    </div>
+  </body>
+</tt>

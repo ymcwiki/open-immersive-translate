@@ -156,13 +156,13 @@ describe("configuration transfer", () => {
 describe("temporary runtime adapter", () => {
   it("validates service-test and cache responses", async () => {
     browserMock.runtime.sendMessage
-      .mockResolvedValueOnce({ ok: true, message: "ok" })
+      .mockResolvedValueOnce({ ok: true, latencyMs: 9, sample: "你好" })
       .mockResolvedValueOnce({ count: 12 })
       .mockResolvedValueOnce({ cleared: 12 });
 
     await expect(
       testServiceConnection("google", { kind: "google" }),
-    ).resolves.toEqual({ ok: true, message: "ok" });
+    ).resolves.toEqual({ ok: true, latencyMs: 9, sample: "你好" });
     await expect(getCacheCount()).resolves.toBe(12);
     await expect(clearCache()).resolves.toBe(12);
     expect(browserMock.runtime.sendMessage).toHaveBeenNthCalledWith(1, {

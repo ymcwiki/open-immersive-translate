@@ -116,10 +116,9 @@ export interface TestServiceMessage {
   config?: ServiceConfig;
 }
 
-export interface ServiceTestResult {
-  ok: boolean;
-  message?: string;
-}
+export type ServiceTestResult =
+  | { ok: true; latencyMs: number; sample: string }
+  | { ok: false; latencyMs: number; error: string };
 
 /** Read and clear translation-cache metadata. */
 export interface GetCacheStatsMessage {

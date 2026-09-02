@@ -99,7 +99,11 @@ export function init(
     host = null;
   };
 
-  const showIcon = (text: string, position: SelectionPosition): void => {
+  const showIcon = (
+    text: string,
+    position: SelectionPosition,
+    openImmediately = false,
+  ): void => {
     close();
     const selectionHost = document.createElement("div");
     selectionHost.dataset.imt = "selection";
@@ -217,7 +221,8 @@ export function init(
     trigger.addEventListener("click", translate);
     if (config.selection.triggerMode === "icon-hover") {
       trigger.addEventListener("pointerenter", translate);
-    } else if (config.selection.triggerMode === "direct") {
+    }
+    if (openImmediately || config.selection.triggerMode === "direct") {
       translate();
     }
 
@@ -274,15 +279,36 @@ export function init(
     if (event.key === "Escape") close();
   };
 
+  const onContextMenuSelection = (event: Event): void => {
+    if (!(event instanceof CustomEvent)) return;
+    const detail = event.detail as { text?: unknown } | undefined;
+    const text = typeof detail?.text === "string" ? detail.text.trim() : "";
+    if (!text) return;
+    event.preventDefault();
+    showIcon(
+      text,
+      {
+        left: Math.max(8, window.innerWidth - 352),
+        top: Math.max(8, window.innerHeight - 220),
+      },
+      true,
+    );
+  };
+
   document.addEventListener("mouseup", onMouseUp);
   document.addEventListener("pointerdown", onPointerDown, true);
   document.addEventListener("keydown", onKeyDown, true);
+  document.addEventListener("imt:translate-selection", onContextMenuSelection);
 
   return () => {
     close();
     document.removeEventListener("mouseup", onMouseUp);
     document.removeEventListener("pointerdown", onPointerDown, true);
     document.removeEventListener("keydown", onKeyDown, true);
+    document.removeEventListener(
+      "imt:translate-selection",
+      onContextMenuSelection,
+    );
   };
 }
 

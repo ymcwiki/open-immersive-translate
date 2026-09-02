@@ -1,6 +1,5 @@
 import browser from "webextension-polyfill";
 
-import { isPageCommandId } from "../content/controller/commands";
 import { init as initPdfInterception } from "../pdf/intercept";
 import {
   CONFIG_STORAGE_KEY,
@@ -17,10 +16,7 @@ import {
   onTranslatePort,
   sendToTab,
   type BackgroundRequest,
-  type PageTranslationStateMessage,
   type ServiceInfo,
-  type ServiceTestResult,
-  type TabMessage,
   type TranslateMessage,
 } from "../shared/messages";
 import type { Rule, ServiceConfig } from "../shared/types";
@@ -29,6 +25,13 @@ import {
   cleanupTranslationCache,
   getTranslationCacheCount,
 } from "./cache";
+import {
+  isPageTranslationStateMessage,
+  PageBadgeController,
+  type BadgeActionApi,
+} from "./badge";
+import { routeExtensionCommand } from "./commands";
+import { createContextMenus, routeContextMenuClick } from "./context-menus";
 import { matchRule, validateRule } from "./rules/match";
 import { getRemoteRules, registerRemoteRules } from "./rules/remote-rules";
 import { cancel, cancelTab, translate } from "./scheduler";
@@ -38,16 +41,8 @@ import {
   initTranslationServices,
   listServices,
 } from "./services";
-import {
-  serializeTranslateError,
-  TranslateError,
-  type TranslationService,
-} from "./services/base";
-
-const MENU_TRANSLATE_PAGE = "imt-translate-page";
-const MENU_TRANSLATE_SELECTION = "imt-translate-selection";
-const MENU_AI_WRITING = "imt-ai-writing";
-const MENU_EXPLAIN_SELECTION = "imt-explain-selection";
+import { TranslateError, type TranslationService } from "./services/base";
+import { runServiceTest } from "./service-test";
 
 interface NativeSidePanelApi {
   open(options: { tabId: number }): Promise<void>;
@@ -62,9 +57,17 @@ function sidePanelApi(): NativeSidePanelApi | undefined {
   ).chrome?.sidePanel;
 }
 
+function actionApi(): BadgeActionApi {
+  const native = (
+    globalThis as unknown as { chrome?: { action?: BadgeActionApi } }
+  ).chrome?.action;
+  return native ?? (browser.action as unknown as BadgeActionApi);
+}
+
 initTranslationServices();
 registerRemoteRules();
 initPdfInterception();
+const pageBadges = new PageBadgeController(actionApi());
 
 async function configuredRule(url: string): Promise<Rule> {
   const [config, remoteRules] = await Promise.all([
@@ -159,40 +162,19 @@ async function runAssistantRequest(
   return service.completePrompt(request, signal);
 }
 
-async function testService(
-  serviceId: string,
-  unsavedConfig?: ServiceConfig,
-): Promise<ServiceTestResult> {
-  try {
-    const config = await loadConfig();
-    const serviceConfig = unsavedConfig ?? config.services[serviceId];
-    if (!serviceConfig) {
-      return { ok: false, message: `未找到服务配置：${serviceId}` };
-    }
-    if (serviceConfig.enabled !== true) {
-      return { ok: false, message: `服务未启用：${serviceId}` };
-    }
-
-    const service = createService(serviceId, serviceConfig);
-    const result = await service.translate(
-      {
-        texts: ["Hello"],
-        from: "en",
-        to: config.targetLanguage === "en" ? "zh-CN" : config.targetLanguage,
-      },
-      new AbortController().signal,
-    );
-    const itemError = result.errors?.[0];
-    if (itemError) return { ok: false, message: itemError.message };
-    return result.texts[0]
-      ? { ok: true, message: "连接成功" }
-      : { ok: false, message: "服务返回了空译文" };
-  } catch (error) {
+async function testService(serviceId: string, unsavedConfig?: ServiceConfig) {
+  const config = await loadConfig();
+  const serviceConfig = unsavedConfig ?? config.services[serviceId];
+  if (!serviceConfig) {
     return {
-      ok: false,
-      message: serializeTranslateError(error, serviceId).message,
+      ok: false as const,
+      latencyMs: 0,
+      error: `未找到服务配置：${serviceId}`,
     };
   }
+  return runServiceTest(serviceId, serviceConfig, {
+    targetLanguage: config.targetLanguage,
+  });
 }
 
 function runTranslation(request: TranslateMessage): void {
@@ -201,47 +183,10 @@ function runTranslation(request: TranslateMessage): void {
   });
 }
 
-function isPageTranslationStateMessage(
-  message: unknown,
-): message is PageTranslationStateMessage {
-  return (
-    typeof message === "object" &&
-    message !== null &&
-    "type" in message &&
-    message.type === "pageTranslationState"
-  );
-}
-
-function updateBadge(
-  tabId: number,
-  message: PageTranslationStateMessage,
-): void {
-  const badge = {
-    idle: "",
-    translating: "…",
-    done: "✓",
-    error: "!",
-  }[message.state.status];
-  const color = {
-    idle: "#64748b",
-    translating: "#2563eb",
-    done: "#15803d",
-    error: "#b42318",
-  }[message.state.status];
-  void browser.action.setBadgeText({ tabId, text: badge });
-  void browser.action.setBadgeBackgroundColor({ tabId, color });
-  void browser.action.setTitle({
-    tabId,
-    title: `翻译 ${message.state.translated}/${message.state.total}，失败 ${message.state.errors}`,
-  });
-}
-
 browser.runtime.onMessage.addListener(
   (message: unknown, sender: browser.Runtime.MessageSender) => {
     if (isPageTranslationStateMessage(message)) {
-      const tabId = sender.tab?.id;
-      if (tabId !== undefined) updateBadge(tabId, message);
-      return Promise.resolve({ received: true as const });
+      return pageBadges.handleMessage(message, sender);
     }
     if (
       typeof message !== "object" ||
@@ -393,14 +338,6 @@ browser.runtime.onConnect.addListener((port) => {
   });
 });
 
-async function sendToActiveTab(
-  message: (tabId: number) => TabMessage,
-): Promise<void> {
-  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-  if (tab?.id === undefined) return;
-  await sendToTab(tab.id, message(tab.id));
-}
-
 async function dispatchPageCommand(
   command: string,
   targetTabId?: number,
@@ -417,70 +354,39 @@ async function dispatchPageCommand(
 }
 
 browser.commands.onCommand.addListener((command) => {
-  if (command === "toggle-side-panel") {
-    void browser.tabs
-      .query({ active: true, currentWindow: true })
-      .then(([tab]) =>
-        tab?.id === undefined
-          ? undefined
-          : sidePanelApi()?.open({ tabId: tab.id }),
-      )
-      .catch(() => undefined);
-    return;
-  }
-  if (command === "open-ai-writing") {
-    void sendToActiveTab(() => ({ type: "openAiWriting" })).catch(
-      () => undefined,
-    );
-    return;
-  }
-  if (command === "translate-input") {
-    void sendToActiveTab((tabId) => ({ type: "translateInput", tabId })).catch(
-      () => undefined,
-    );
-    return;
-  }
-  if (command === "toggleVideoSubtitlePreTranslation") {
-    void sendToActiveTab((tabId) => ({
-      type: "toggleVideoSubtitlePreTranslation",
-      tabId,
-    })).catch(() => undefined);
-    return;
-  }
-  if (isPageCommandId(command)) {
-    void dispatchPageCommand(command).catch(() => undefined);
-  }
+  void routeExtensionCommand(command, {
+    async getActiveTabId() {
+      const [tab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      return tab?.id;
+    },
+    sendControllerCommand: (tabId, command) =>
+      dispatchPageCommand(command, tabId),
+    async sendTabMessage(tabId, message) {
+      await browser.tabs.sendMessage(tabId, message, { frameId: 0 });
+    },
+    async openSidePanel(tabId) {
+      await sidePanelApi()?.open({ tabId });
+    },
+  }).catch(() => undefined);
 });
 
 browser.contextMenus.onClicked.addListener((info, tab) => {
-  if (tab?.id === undefined) return;
-  if (info.menuItemId === MENU_TRANSLATE_PAGE) {
-    void dispatchPageCommand("toggleTranslateTheWholePage", tab.id).catch(
-      () => undefined,
-    );
-  } else if (
-    info.menuItemId === MENU_TRANSLATE_SELECTION &&
-    info.selectionText?.trim()
-  ) {
-    void sendToTab(tab.id, {
-      type: "translateSelection",
-      tabId: tab.id,
-      text: info.selectionText.trim(),
-    }).catch(() => undefined);
-  } else if (info.menuItemId === MENU_AI_WRITING) {
-    void sendToTab(tab.id, { type: "openAiWriting" }).catch(() => undefined);
-  } else if (
-    info.menuItemId === MENU_EXPLAIN_SELECTION &&
-    info.selectionText?.trim()
-  ) {
-    const text = info.selectionText.trim();
-    void sidePanelApi()
-      ?.open({ tabId: tab.id })
-      .then(() =>
-        browser.runtime.sendMessage({ type: "sidePanelSelection", text }),
-      )
-      .catch(() => undefined);
-  }
+  void routeContextMenuClick(info, tab, {
+    sendControllerCommand: (tabId, command) =>
+      dispatchPageCommand(command, tabId),
+    async sendTabMessage(tabId, message) {
+      await browser.tabs.sendMessage(tabId, message, { frameId: 0 });
+    },
+    async openExtensionPage(path) {
+      await browser.tabs.create({ url: browser.runtime.getURL(path) });
+    },
+    async openSidePanel(tabId) {
+      await sidePanelApi()?.open({ tabId });
+    },
+  }).catch(() => undefined);
 });
 
 browser.runtime.onInstalled.addListener(() => {
@@ -498,27 +404,11 @@ browser.runtime.onInstalled.addListener(() => {
     await sidePanelApi()?.setPanelBehavior({
       openPanelOnActionClick: false,
     });
-    await browser.contextMenus.removeAll();
-    browser.contextMenus.create({
-      id: MENU_TRANSLATE_PAGE,
-      title: "翻译网页",
-      contexts: ["page"],
-    });
-    browser.contextMenus.create({
-      id: MENU_TRANSLATE_SELECTION,
-      title: "翻译选中文本",
-      contexts: ["selection"],
-    });
-    browser.contextMenus.create({
-      id: MENU_AI_WRITING,
-      title: "AI 写作",
-      contexts: ["editable", "selection"],
-    });
-    browser.contextMenus.create({
-      id: MENU_EXPLAIN_SELECTION,
-      title: "解释这段",
-      contexts: ["selection"],
-    });
+    await createContextMenus(
+      browser.contextMenus as unknown as Parameters<
+        typeof createContextMenus
+      >[0],
+    );
   })().catch((error: unknown) => {
     console.error("[imt] Installation setup failed", error);
   });
@@ -540,4 +430,13 @@ onConfigChange((config) => {
     );
 });
 
-browser.tabs.onRemoved.addListener((tabId) => cancelTab(tabId));
+browser.webNavigation.onCommitted.addListener((details) => {
+  if (details.frameId === 0) {
+    void pageBadges.clear(details.tabId).catch(() => undefined);
+  }
+});
+
+browser.tabs.onRemoved.addListener((tabId) => {
+  cancelTab(tabId);
+  pageBadges.forget(tabId);
+});

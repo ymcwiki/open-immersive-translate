@@ -3,13 +3,18 @@ import { useEffect, useState } from "preact/hooks";
 
 import { builtinRules } from "../../background/rules/builtin-rules";
 import {
+  createService,
   DEFAULT_PROMPTS,
   getModels,
   serviceFields,
   type ServiceFieldDescriptor,
 } from "../../background/services";
 import { LANGUAGE_CODES } from "../../shared/lang";
-import { sendToBackground } from "../../shared/messages";
+import {
+  sendToBackground,
+  type ServiceTestResult,
+} from "../../shared/messages";
+import { EXTENSION_COMMAND_IDS } from "../../background/commands";
 import type {
   JsonValue,
   LangCode,
@@ -31,6 +36,7 @@ import {
 import { useKConfig, type KConfigUpdater } from "../shared/k-config";
 import {
   clearCache,
+  getBrowserCommandBindings,
   getCacheCount,
   testServiceConnection,
 } from "../shared/runtime";
@@ -57,9 +63,20 @@ const tabs: readonly { id: TabId; label: I18nKey }[] = [
   { id: "data", label: "tab.data" },
 ];
 
+function tabFromHash(): TabId {
+  const candidate = window.location.hash.slice(1) as TabId;
+  return tabs.some((tab) => tab.id === candidate) ? candidate : "basic";
+}
+
 export function Options(): preact.JSX.Element {
-  const [activeTab, setActiveTab] = useState<TabId>("basic");
+  const [activeTab, setActiveTab] = useState<TabId>(tabFromHash);
   const { config, error, updateConfig } = useKConfig();
+
+  useEffect(() => {
+    const updateFromHash = (): void => setActiveTab(tabFromHash());
+    window.addEventListener("hashchange", updateFromHash);
+    return () => window.removeEventListener("hashchange", updateFromHash);
+  }, []);
 
   if (!config) {
     return (
@@ -123,7 +140,7 @@ export function Options(): preact.JSX.Element {
         {activeTab === "glossary" && (
           <GlossaryPanel config={config} onPatch={updateConfig} />
         )}
-        {activeTab === "shortcuts" && <ShortcutsPanel config={config} />}
+        {activeTab === "shortcuts" && <ShortcutsPanel />}
         {activeTab === "data" && (
           <DataPanel config={config} onPatch={updateConfig} />
         )}
@@ -317,6 +334,8 @@ function ServicesPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
           key={selectedService}
           serviceId={selectedService}
           service={service}
+          from={config.sourceLanguage}
+          to={config.targetLanguage}
           onPatch={onPatch}
         />
       ) : null}
@@ -327,20 +346,22 @@ function ServicesPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
 interface ServiceCardProps {
   serviceId: string;
   service: ServiceConfig;
+  from: LangCode;
+  to: LangCode;
   onPatch: KConfigUpdater;
 }
 
 function ServiceCard({
   serviceId,
   service,
+  from,
+  to,
   onPatch,
 }: ServiceCardProps): preact.JSX.Element {
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{
-    ok: boolean;
-    message: string;
-  }>();
+  const [testResult, setTestResult] = useState<ServiceTestResult>();
+  const pairSupported = serviceSupportsPair(serviceId, service, from, to);
 
   const updateService = (patch: Partial<ServiceConfig>): void => {
     save(onPatch, (current) => ({
@@ -357,19 +378,17 @@ function ServiceCard({
     try {
       const result = await testServiceConnection(serviceId, service);
       setTestResult(
-        result
-          ? {
-              ok: result.ok,
-              message:
-                result.message ||
-                t(result.ok ? "services.testSuccess" : "services.testFailed"),
-            }
-          : { ok: false, message: t("services.testUnavailable") },
+        result ?? {
+          ok: false,
+          latencyMs: 0,
+          error: t("services.testUnavailable"),
+        },
       );
     } catch (error) {
       setTestResult({
         ok: false,
-        message:
+        latencyMs: 0,
+        error:
           error instanceof Error ? error.message : t("services.testFailed"),
       });
     } finally {
@@ -388,6 +407,11 @@ function ServiceCard({
         />
       }
     >
+      {!pairSupported && (
+        <p role="alert" class="ui-status ui-status-error">
+          {t("services.unsupportedPair", { from, to })}
+        </p>
+      )}
       <div class="form-grid two-columns service-fields">
         {serviceFields(
           serviceId,
@@ -417,12 +441,38 @@ function ServiceCard({
               testResult.ok ? "ui-status-success" : "ui-status-error"
             }`}
           >
-            {testResult.message}
+            {testResult.ok
+              ? t("services.testSuccessDetail", {
+                  latency: testResult.latencyMs,
+                  sample: testResult.sample,
+                })
+              : t("services.testFailedDetail", {
+                  latency: testResult.latencyMs,
+                  error: testResult.error,
+                })}
           </p>
         )}
       </div>
     </Card>
   );
+}
+
+export function serviceSupportsPair(
+  serviceId: string,
+  serviceConfig: ServiceConfig,
+  from: LangCode,
+  to: LangCode,
+): boolean {
+  try {
+    const service = createService(serviceId, serviceConfig);
+    return (
+      service.supportsPair?.(from, to) ??
+      service.supportsLangs?.(from, to) ??
+      true
+    );
+  } catch {
+    return false;
+  }
 }
 
 function ServiceField({
@@ -919,26 +969,41 @@ function GlossaryPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
   );
 }
 
-function ShortcutsPanel({ config }: { config: KConfig }): preact.JSX.Element {
+function ShortcutsPanel(): preact.JSX.Element {
+  const [bindings, setBindings] = useState<
+    Array<{ name: string; description: string; shortcut: string }>
+  >([]);
+  useEffect(() => {
+    void getBrowserCommandBindings()
+      .then(setBindings)
+      .catch(() => setBindings([]));
+  }, []);
   const shortcutLabels: Record<string, I18nKey> = {
     toggleTranslatePage: "shortcuts.toggle",
     toggleTranslateTheWholePage: "shortcuts.wholePage",
-    "translate-input": "shortcuts.input",
+    translateInputBox: "shortcuts.input",
   };
+  const bindingsByName = new Map(bindings.map((item) => [item.name, item]));
   return (
     <Card>
       <p class="ui-status shortcuts-description">
         {t("shortcuts.description")}
       </p>
       <dl class="shortcut-list">
-        {Object.entries(config.shortcuts).map(([command, shortcut]) => (
-          <div key={command}>
-            <dt>
-              {shortcutLabels[command] ? t(shortcutLabels[command]) : command}
-            </dt>
-            <dd>{shortcut || t("shortcuts.unknown")}</dd>
-          </div>
-        ))}
+        {EXTENSION_COMMAND_IDS.map((command) => {
+          const binding = bindingsByName.get(command);
+          const shortcut = binding?.shortcut ?? "";
+          return (
+            <div key={command}>
+              <dt>
+                {shortcutLabels[command]
+                  ? t(shortcutLabels[command])
+                  : (binding?.description ?? command)}
+              </dt>
+              <dd>{shortcut || t("shortcuts.unknown")}</dd>
+            </div>
+          );
+        })}
       </dl>
       <a href="chrome://extensions/shortcuts" target="_blank">
         {t("shortcuts.manage")}

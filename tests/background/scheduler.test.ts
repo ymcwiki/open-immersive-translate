@@ -20,6 +20,7 @@ class FakeService implements TranslationService {
   readonly calls: string[][] = [];
   active = 0;
   maximumActive = 0;
+  supportsPair?: TranslationService["supportsPair"];
 
   constructor(
     readonly id: string,
@@ -232,6 +233,70 @@ describe("TranslationScheduler", () => {
     expect(primary.calls).toHaveLength(2);
     expect(fallback.calls).toHaveLength(1);
     expect(output).toEqual([{ id: "a", text: "fallback:source" }]);
+  });
+
+  it("skips an unsupported primary service and uses its fallback", async () => {
+    const primary = new FakeService(
+      "primary",
+      10,
+      100,
+      { rps: 10_000, concurrency: 1 },
+      async ({ texts }) => ({ texts }),
+    );
+    primary.supportsPair = vi.fn(() => false);
+    const fallback = new FakeService(
+      "fallback",
+      10,
+      100,
+      { rps: 10_000, concurrency: 1 },
+      async ({ texts }) => ({
+        texts: texts.map((text) => `fallback:${text}`),
+      }),
+    );
+    fallback.supportsPair = vi.fn(() => true);
+    const scheduler = new TranslationScheduler({
+      cache: memoryCache(),
+      services: [primary, fallback],
+      fallbackServices: { primary: "fallback" },
+    });
+    const output: Array<{ id: string; text?: string }> = [];
+
+    await scheduler.translateParagraphs(
+      request({
+        items: [{ id: "a", text: "source" }],
+        onResult: (batch) => {
+          output.push(...batch);
+        },
+      }),
+    );
+
+    expect(primary.calls).toHaveLength(0);
+    expect(fallback.calls).toEqual([["source"]]);
+    expect(output).toEqual([{ id: "a", text: "fallback:source" }]);
+  });
+
+  it("reports a clear error when no configured service supports the pair", async () => {
+    const primary = new FakeService(
+      "primary",
+      10,
+      100,
+      { rps: 10_000, concurrency: 1 },
+      async ({ texts }) => ({ texts }),
+    );
+    primary.supportsPair = vi.fn(() => false);
+    const scheduler = new TranslationScheduler({
+      cache: memoryCache(),
+      services: [primary],
+    });
+
+    await expect(
+      scheduler.translateParagraphs(
+        request({ items: [{ id: "a", text: "source" }] }),
+      ),
+    ).rejects.toMatchObject({
+      code: "INVALID_CONFIG",
+      message: "No configured service supports en to zh-CN.",
+    });
   });
 
   it("cancelTab aborts active work for that tab", async () => {

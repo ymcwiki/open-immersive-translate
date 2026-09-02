@@ -22,23 +22,35 @@ const browserMock = vi.hoisted(() => ({
       removeListener: vi.fn(),
     },
   },
+  commands: {
+    getAll: vi.fn(),
+  },
 }));
 
 vi.mock("webextension-polyfill", () => ({ default: browserMock }));
 
 import { DEFAULT_CONFIG } from "../../src/shared/config";
+import { EXTENSION_COMMAND_IDS } from "../../src/background/commands";
 import type { Config } from "../../src/shared/types";
 import { Options } from "../../src/ui/options/index";
 
 let stored: Config;
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "/");
   stored = structuredClone(DEFAULT_CONFIG);
   browserMock.runtime.sendMessage.mockReset();
   browserMock.storage.local.get.mockReset();
   browserMock.storage.local.set.mockReset();
   browserMock.storage.onChanged.addListener.mockReset();
   browserMock.storage.onChanged.removeListener.mockReset();
+  browserMock.commands.getAll.mockReset().mockResolvedValue(
+    EXTENSION_COMMAND_IDS.map((name, index) => ({
+      name,
+      description: `${name} action`,
+      shortcut: index === 0 ? "Alt+A" : "",
+    })),
+  );
   browserMock.runtime.sendMessage.mockResolvedValue(undefined);
   browserMock.storage.local.get.mockImplementation(async () => ({
     config: stored,
@@ -76,7 +88,8 @@ describe("Options", () => {
   it("sends service connection tests and displays the result", async () => {
     browserMock.runtime.sendMessage.mockResolvedValue({
       ok: true,
-      message: "连接正常",
+      latencyMs: 18,
+      sample: "你好",
     });
     render(<Options />);
 
@@ -84,13 +97,59 @@ describe("Options", () => {
     fireEvent.click(screen.getByRole("tab", { name: "翻译服务" }));
     fireEvent.click(screen.getAllByRole("button", { name: "测试连接" })[0]!);
 
-    await screen.findByText("连接正常");
+    await screen.findByText("连接成功（18 ms）：你好");
     expect(browserMock.runtime.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "testService",
         serviceId: "openai-compatible",
       }),
     );
+  });
+
+  it("lists every manifest command with live Chrome bindings", async () => {
+    render(<Options />);
+    await screen.findByRole("heading", { name: "基本", level: 2 });
+
+    fireEvent.click(screen.getByRole("tab", { name: "快捷键" }));
+
+    await waitFor(() => expect(browserMock.commands.getAll).toHaveBeenCalled());
+    expect(document.querySelectorAll(".shortcut-list > div")).toHaveLength(
+      EXTENSION_COMMAND_IDS.length,
+    );
+    expect(screen.getByText("Alt+A")).toBeTruthy();
+    expect(screen.getByText("toggleSidePanel action")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("link", { name: "在 Chrome 中管理快捷键" })
+        .getAttribute("href"),
+    ).toBe("chrome://extensions/shortcuts");
+  });
+
+  it("opens the import/export panel from the popup shortcut hash", async () => {
+    window.history.replaceState(null, "", "#data");
+
+    render(<Options />);
+
+    await screen.findByRole("heading", {
+      name: "缓存 / 导入导出",
+      level: 2,
+    });
+    expect(screen.getByRole("heading", { name: "翻译缓存" })).toBeTruthy();
+  });
+
+  it("warns when the service card does not support the selected pair", async () => {
+    stored.sourceLanguage = "de";
+    stored.targetLanguage = "it";
+    render(<Options />);
+    await screen.findByRole("heading", { name: "基本", level: 2 });
+
+    fireEvent.click(screen.getByRole("tab", { name: "翻译服务" }));
+    fireEvent.change(screen.getByLabelText("选择服务"), {
+      target: { value: "caiyun" },
+    });
+
+    const warning = await screen.findByRole("alert");
+    expect(warning.textContent).toContain("不支持 de → it");
   });
 
   it("rejects a malformed import before confirmation or storage writes", async () => {

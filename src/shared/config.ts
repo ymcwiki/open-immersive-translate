@@ -196,9 +196,9 @@ const DEFAULT_SHORTCUTS: Record<string, string> = {
   toggleTranslateTheWholePage: "Alt+W",
   toggleTranslateTheMainPage: "Alt+M",
   toggleOnlyTranslation: "Alt+T",
-  "toggle-side-panel": "Alt+S",
-  "translate-input": "Alt+I",
-  "open-ai-writing": "",
+  toggleSidePanel: "Alt+S",
+  translateInputBox: "Alt+I",
+  openAiWritingModal: "",
 };
 
 /** Runtime schema for the complete local configuration, including defaults. */

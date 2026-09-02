@@ -53,6 +53,8 @@
 - `ParagraphTranslationResult`: one streamed paragraph success or error.
 - `BackgroundRequest` / `BackgroundResponse<T>`: request union and inferred response mapping.
 - `TranslateAcknowledgement` / `CancelAcknowledgement`: one-off command acknowledgements.
+- `ServiceTestResult`: connection-test result with measured latency and either a translated sample or a serialized error.
+- `PageTranslationStateMessage`: per-tab controller status and paragraph counts used by the action badge.
 - `TabMessage`: messages accepted by content scripts.
 - `sendToBackground(message)`: typed runtime request with inferred response.
 - `sendToTab(tabId, message)`: typed one-off content-script message.
