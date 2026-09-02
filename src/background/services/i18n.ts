@@ -14,6 +14,18 @@ const zhCN = {
   stream: "流式输出",
   promptSystem: "系统提示词",
   promptUser: "用户提示词",
+  prompt: "系统提示词（旧版）",
+  apiPath: "API 路径",
+  temperature: "温度",
+  maxTokens: "最大输出 token",
+  timeoutMs: "超时（毫秒）",
+  method: "请求方法",
+  maxBatchSize: "批大小",
+  maxBatchChars: "批字符数",
+  fallbackService: "备用服务",
+  headers: "请求头 JSON",
+  requestBodyTemplate: "请求体模板",
+  responseJsonPath: "响应 JSON 路径",
 } as const;
 
 export type ServiceI18nKey = keyof typeof zhCN;
@@ -32,6 +44,18 @@ const en: Record<ServiceI18nKey, string> = {
   stream: "Streaming",
   promptSystem: "System prompt",
   promptUser: "User prompt",
+  prompt: "System prompt (legacy)",
+  apiPath: "API path",
+  temperature: "Temperature",
+  maxTokens: "Maximum output tokens",
+  timeoutMs: "Timeout (ms)",
+  method: "Request method",
+  maxBatchSize: "Batch size",
+  maxBatchChars: "Batch characters",
+  fallbackService: "Fallback service",
+  headers: "Headers JSON",
+  requestBodyTemplate: "Request body template",
+  responseJsonPath: "Response JSON path",
 };
 
 export function serviceText(

@@ -45,6 +45,7 @@ describe("Firefox manifest transform", () => {
   it("maps a Chrome side panel to a Firefox sidebar action", () => {
     const source = {
       ...baseManifest,
+      permissions: ["storage", "sidePanel"],
       side_panel: { default_path: "side-panel.html" },
     };
 
@@ -54,6 +55,7 @@ describe("Firefox manifest transform", () => {
       default_title: "Bilingual Translator",
     });
     expect(transformFirefoxManifest(source)).not.toHaveProperty("side_panel");
+    expect(transformFirefoxManifest(source).permissions).toEqual(["storage"]);
   });
 
   it("omits sidebar_action when no side panel exists", () => {

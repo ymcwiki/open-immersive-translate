@@ -1,4 +1,4 @@
-import { t, type UiLocale } from "../../ui/shared/i18n";
+import { t } from "../../ui/shared/i18n";
 
 const messages = {
   "zh-CN": {
@@ -15,8 +15,10 @@ const messages = {
 
 export type ControllerI18nKey = keyof (typeof messages)["zh-CN"] | "loading";
 
-function locale(): UiLocale {
-  return navigator.language.toLocaleLowerCase().startsWith("zh") ? "zh-CN" : "en";
+function locale(): "zh-CN" | "en" {
+  return navigator.language.toLocaleLowerCase().startsWith("zh")
+    ? "zh-CN"
+    : "en";
 }
 
 /** Resolve controller strings through the existing UI helper with local fallbacks. */

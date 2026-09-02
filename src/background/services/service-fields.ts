@@ -32,6 +32,15 @@ const credentials: Record<string, readonly ServiceFieldName[]> = {
   niutrans: ["apiKey", "baseUrl"],
   openl: ["apiKey", "baseUrl"],
   "azure-openai": ["apiKey", "baseUrl", "deployment", "apiVersion"],
+  google: [],
+  deeplx: ["baseUrl"],
+  "custom-http": [
+    "baseUrl",
+    "method",
+    "headers",
+    "requestBodyTemplate",
+    "responseJsonPath",
+  ],
 };
 
 const aiFields: readonly ServiceFieldName[] = [
@@ -42,6 +51,20 @@ const aiFields: readonly ServiceFieldName[] = [
   "stream",
   "promptSystem",
   "promptUser",
+  "apiPath",
+  "temperature",
+  "maxTokens",
+  "timeoutMs",
+  "maxBatchSize",
+  "maxBatchChars",
+  "fallbackService",
+];
+
+const transportFields: readonly ServiceFieldName[] = [
+  "timeoutMs",
+  "maxBatchSize",
+  "maxBatchChars",
+  "fallbackService",
 ];
 
 function fieldType(name: ServiceFieldName): ServiceFieldType {
@@ -49,8 +72,23 @@ function fieldType(name: ServiceFieldName): ServiceFieldType {
   if (name === "stream") return "checkbox";
   if (name === "formality") return "select";
   if (name === "model") return "model";
-  if (name === "models" || name === "promptSystem" || name === "promptUser")
+  if (
+    name === "models" ||
+    name === "promptSystem" ||
+    name === "promptUser" ||
+    name === "prompt" ||
+    name === "headers" ||
+    name === "requestBodyTemplate"
+  )
     return "textarea";
+  if (
+    name === "temperature" ||
+    name === "maxTokens" ||
+    name === "timeoutMs" ||
+    name === "maxBatchSize" ||
+    name === "maxBatchChars"
+  )
+    return "text";
   return "text";
 }
 
@@ -89,7 +127,14 @@ export function serviceFields(
           (name) => !(credentials[serviceId] ?? []).includes(name),
         ),
       ]
-    : [...(credentials[serviceId] ?? [])];
+    : [
+        ...(credentials[serviceId] ?? []),
+        ...(["google", "deeplx", "custom-http"].includes(serviceId)
+          ? transportFields.filter(
+              (name) => !(credentials[serviceId] ?? []).includes(name),
+            )
+          : []),
+      ];
   return names.map((name) => ({
     name,
     label: serviceText(name, locale),

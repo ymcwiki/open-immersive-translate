@@ -160,6 +160,38 @@ describe("TranslationScheduler", () => {
     ]);
   });
 
+  it("does not reuse a cached translation across glossary variants", async () => {
+    const service = new FakeService(
+      "primary",
+      10,
+      100,
+      { rps: 10_000, concurrency: 2 },
+      async ({ texts, glossary }) => ({
+        texts: texts.map(() => glossary?.[0]?.v ?? "missing"),
+      }),
+    );
+    const scheduler = new TranslationScheduler({
+      cache: memoryCache(),
+      services: [service],
+    });
+    const output: string[] = [];
+
+    for (const term of ["术语甲", "术语乙"]) {
+      await scheduler.translateParagraphs(
+        request({
+          items: [{ id: term, text: "shared source" }],
+          glossary: [{ k: "source", v: term }],
+          onResult: (batch) => {
+            output.push(batch[0]?.text ?? "");
+          },
+        }),
+      );
+    }
+
+    expect(service.calls).toHaveLength(2);
+    expect(output).toEqual(["术语甲", "术语乙"]);
+  });
+
   it("retries a network failure once and then uses the fallback service", async () => {
     const primary = new FakeService(
       "primary",

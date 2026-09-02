@@ -239,8 +239,15 @@ body {
 .glossary-header,
 .glossary-row {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr 1fr auto;
   gap: 10px;
+}
+
+.remote-rule-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
 }
 
 .glossary-header {

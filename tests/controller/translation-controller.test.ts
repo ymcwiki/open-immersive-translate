@@ -3,17 +3,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const portPosts = vi.hoisted(() => [] as unknown[]);
 const portListeners = vi.hoisted(() => [] as Array<(message: unknown) => void>);
 const disconnectListeners = vi.hoisted(() => [] as Array<() => void>);
-const controllerStorage = vi.hoisted(() => ({ values: {} as Record<string, unknown> }));
+const controllerStorage = vi.hoisted(() => ({
+  values: {} as Record<string, unknown>,
+}));
 const browserMock = vi.hoisted(() => ({
   runtime: {
     connect: vi.fn(() => ({
       postMessage: vi.fn((message: unknown) => portPosts.push(message)),
       onMessage: {
-        addListener: vi.fn((listener: (message: unknown) => void) => portListeners.push(listener)),
+        addListener: vi.fn((listener: (message: unknown) => void) =>
+          portListeners.push(listener),
+        ),
         removeListener: vi.fn(),
       },
       onDisconnect: {
-        addListener: vi.fn((listener: () => void) => disconnectListeners.push(listener)),
+        addListener: vi.fn((listener: () => void) =>
+          disconnectListeners.push(listener),
+        ),
         removeListener: vi.fn(),
       },
       disconnect: vi.fn(),
@@ -21,7 +27,9 @@ const browserMock = vi.hoisted(() => ({
   },
   storage: {
     local: {
-      get: vi.fn(async (key: string) => ({ [key]: controllerStorage.values[key] })),
+      get: vi.fn(async (key: string) => ({
+        [key]: controllerStorage.values[key],
+      })),
       set: vi.fn(async (patch: Record<string, unknown>) => {
         Object.assign(controllerStorage.values, patch);
       }),
@@ -32,6 +40,7 @@ const browserMock = vi.hoisted(() => ({
 vi.mock("webextension-polyfill", () => ({ default: browserMock }));
 
 import { generalRule } from "../../src/background/rules/defaults";
+import { DEFAULT_CONFIG } from "../../src/shared/config";
 import { TranslationController } from "../../src/content/controller/translation-controller";
 import { TRANSLATION_OVERRIDES_KEY } from "../../src/content/controller/editable";
 import { extractParagraphs } from "../../src/content/extract/scanner";
@@ -40,26 +49,9 @@ import type { Config } from "../../src/shared/types";
 
 function config(): Config {
   return {
-    version: 1,
-    targetLanguage: "zh-CN",
-    sourceLanguage: "auto",
-    translationMode: "dual",
-    theme: "underline",
-    service: "google",
-    services: {},
-    shortcuts: {},
-    alwaysTranslateSites: [],
-    neverTranslateSites: [],
-    alwaysTranslateLangs: [],
-    neverTranslateLangs: [],
-    glossaries: [],
-    userRules: [],
-    input: { enabled: true, trigger: "//" },
-    hover: { enabled: false, holdKey: "Alt" },
-    selection: { enabled: true },
+    ...structuredClone(DEFAULT_CONFIG),
     floatBall: { enabled: false, position: "right" },
-    subtitle: { youtube: false },
-    cache: { enabled: true, maxAgeDays: 30 },
+    subtitle: { ...DEFAULT_CONFIG.subtitle, youtube: false },
   };
 }
 
@@ -104,13 +96,15 @@ describe("TranslationController", () => {
       reportState: states,
     });
     controller.start("main");
-    expect(document.querySelector('style[data-imt="style"]')?.textContent).toContain(
-      "--workstream-j-global: 1",
-    );
+    expect(
+      document.querySelector('style[data-imt="style"]')?.textContent,
+    ).toContain("--workstream-j-global: 1");
     await vi.advanceTimersByTimeAsync(150);
 
     const request = portPosts.find(
-      (item): item is {
+      (
+        item,
+      ): item is {
         type: "translate";
         requestId: string;
         paragraphs: Array<{ id: string; text: string }>;
@@ -119,9 +113,15 @@ describe("TranslationController", () => {
       } => (item as { type?: string }).type === "translate",
     );
     expect(request).toBeDefined();
-    expect(request?.paragraphs.map(({ text }) => text).join(" ")).toContain("main article");
-    expect(request?.paragraphs.map(({ text }) => text).join(" ")).not.toContain("Navigation");
-    expect(request?.paragraphs.map(({ text }) => text).join(" ")).not.toContain("Footer");
+    expect(request?.paragraphs.map(({ text }) => text).join(" ")).toContain(
+      "main article",
+    );
+    expect(request?.paragraphs.map(({ text }) => text).join(" ")).not.toContain(
+      "Navigation",
+    );
+    expect(request?.paragraphs.map(({ text }) => text).join(" ")).not.toContain(
+      "Footer",
+    );
     expect(request?.glossary).toEqual([{ k: "article", v: "文章" }]);
     expect(request?.context.title).toBe("Test article");
     expect(request?.context.summary?.split(/\s+/)).toHaveLength(5);
@@ -129,17 +129,24 @@ describe("TranslationController", () => {
     portListeners[0]?.({
       type: "translateResult",
       requestId: request?.requestId,
-      results: request?.paragraphs.map(({ id }) => ({ id, text: "译文" })) ?? [],
+      results:
+        request?.paragraphs.map(({ id }) => ({ id, text: "译文" })) ?? [],
       done: true,
     });
     const target = document.querySelector<HTMLElement>('[data-imt="target"]');
     expect(target?.classList.contains("imt-theme-paper")).toBe(true);
-    expect(target?.style.getPropertyValue("--imt-target-font-size")).toBe("17px");
-    expect(target?.style.getPropertyValue("--imt-target-color")).toBe("#123456");
+    expect(target?.style.getPropertyValue("--imt-target-font-size")).toBe(
+      "17px",
+    );
+    expect(target?.style.getPropertyValue("--imt-target-color")).toBe(
+      "#123456",
+    );
     expect(document.querySelector('[data-imt="source"]')?.classList).toContain(
       "imt-source-hidden",
     );
-    expect(states).toHaveBeenCalledWith(expect.objectContaining({ status: "done" }));
+    expect(states).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "done" }),
+    );
     controller.destroy();
   });
 
@@ -148,7 +155,10 @@ describe("TranslationController", () => {
     document.body.innerHTML =
       "<article><p>This saved paragraph has enough English words for language detection.</p></article>";
     const rule = { ...generalRule, isTranslateTitle: false };
-    const paragraph = extractParagraphs(document.querySelector("article")!, rule)[0]!;
+    const paragraph = extractParagraphs(
+      document.querySelector("article")!,
+      rule,
+    )[0]!;
     controllerStorage.values[TRANSLATION_OVERRIDES_KEY] = {
       localhost: { [paragraph.id]: "已保存的译文" },
     };
@@ -156,7 +166,9 @@ describe("TranslationController", () => {
     controller.start("main");
     await vi.advanceTimersByTimeAsync(150);
 
-    expect(document.querySelector('[data-imt="target"]')?.textContent).toBe("已保存的译文");
+    expect(document.querySelector('[data-imt="target"]')?.textContent).toBe(
+      "已保存的译文",
+    );
     expect(portPosts).toHaveLength(0);
     controller.destroy();
   });
@@ -178,7 +190,9 @@ describe("TranslationController", () => {
     for (let index = 0; index < 5; index += 1) await Promise.resolve();
 
     const requests = portPosts.filter(
-      (item): item is {
+      (
+        item,
+      ): item is {
         type: "translate";
         requestId: string;
         paragraphs: Array<{ id: string; text: string }>;
@@ -193,7 +207,9 @@ describe("TranslationController", () => {
       portListeners[0]?.({
         type: "translateResult",
         requestId: request.requestId,
-        results: [{ id: source.id, text: source.text === "first line" ? "一" : "二" }],
+        results: [
+          { id: source.id, text: source.text === "first line" ? "一" : "二" },
+        ],
         done: true,
       });
     }

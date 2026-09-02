@@ -1,7 +1,6 @@
 import type {
   Config,
   GlossaryEntry,
-  LangCode,
   Paragraph,
   Rule,
   TranslationMode,
@@ -16,36 +15,9 @@ export interface TranslationModePattern {
   translationMatches: string[];
 }
 
-export interface AdvancedPageConfig extends Config {
-  alwaysTranslateLangs: LangCode[];
-  neverTranslateLangs: LangCode[];
-  glossaries: DomainGlossaryEntry[];
-  translationModeUrlPattern?: TranslationModePattern;
-  translationModeLanguagePattern?: TranslationModePattern;
-  translationThemePatterns?: Record<string, string[]>;
-  translateMainOnly?: boolean;
-  translateToPageEndImmediately?: boolean;
-  immediateTranslationConcurrency?: number;
-  translationMask?: boolean;
-  enableEditTranslation?: boolean;
-  hoverTranslateDirectly?: boolean;
-  videoSubtitlePreTranslation?: boolean;
-  mainFrameMinTextCount?: number;
-  contextWordLimit?: number;
-  translationFontSize?: string | number;
-  translationColor?: string;
-  translationLineHeight?: string | number;
-  globalCustomCss?: string;
-}
+export type AdvancedPageConfig = Config;
 
-export interface AdvancedPageRule extends Rule {
-  glossaries?: DomainGlossaryEntry[];
-  additionalGlossaries?: DomainGlossaryEntry[];
-  mainFrameMinTextCount?: number;
-  likePreSelectors?: string[];
-  isTransformPreTagNewLine?: boolean;
-  advanceTransformPreTagNewLine?: boolean;
-}
+export type AdvancedPageRule = Rule;
 
 export const PAGE_COMMAND_IDS = [
   "toggleTranslatePage",

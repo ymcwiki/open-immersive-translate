@@ -130,6 +130,10 @@ describe("Popup", () => {
     expect(browserMock.tabs.create).toHaveBeenCalledWith({
       url: "chrome-extension://test/src/pdf/index.html",
     });
+    fireEvent.click(screen.getByRole("menuitem", { name: "翻译字幕文件" }));
+    expect(browserMock.tabs.create).toHaveBeenCalledWith({
+      url: "chrome-extension://test/src/subtitle-file/index.html",
+    });
     fireEvent.click(screen.getByRole("menuitem", { name: "打开侧边栏" }));
     expect(browserMock.runtime.sendMessage).toHaveBeenCalledWith({
       type: "openSidePanel",

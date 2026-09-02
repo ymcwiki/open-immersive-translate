@@ -7,7 +7,11 @@ import { MockService } from "./mock";
 import { TranslateError, type TranslationService } from "./base";
 import type { ServiceConfig } from "../../shared/types";
 import { createPhase3Service, registerPhase3Services } from "./phase3";
-export { getModels, serviceFields } from "./service-fields";
+export {
+  getModels,
+  serviceFields,
+  type ServiceFieldDescriptor,
+} from "./service-fields";
 export { DEFAULT_PROMPTS } from "./prompts";
 export { OPENAI_PROVIDER_PRESETS } from "./presets";
 
@@ -60,6 +64,9 @@ export function createService(
     rateLimit: config.rateLimit,
     headers: config.headers,
     timeoutMs: config.timeoutMs,
+    promptSystem: config.promptSystem,
+    promptUser: config.promptUser,
+    stream: config.stream,
   };
 
   switch (config.kind) {

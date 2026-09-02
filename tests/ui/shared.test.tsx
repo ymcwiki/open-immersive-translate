@@ -110,17 +110,17 @@ describe("i18n", () => {
 
 describe("service field descriptors", () => {
   it("drives AI and custom HTTP credential forms", () => {
-    expect(serviceFields("openai-compatible").map(({ key }) => key)).toContain(
-      "model",
-    );
-    expect(serviceFields("custom-http").map(({ key }) => key)).toEqual(
+    expect(
+      serviceFields("openai-compatible").map(({ name }) => name),
+    ).toContain("model");
+    expect(serviceFields("custom-http").map(({ name }) => name)).toEqual(
       expect.arrayContaining([
         "headers",
         "requestBodyTemplate",
         "responseJsonPath",
       ]),
     );
-    expect(serviceFields("google").map(({ key }) => key)).not.toContain(
+    expect(serviceFields("google").map(({ name }) => name)).not.toContain(
       "apiKey",
     );
   });

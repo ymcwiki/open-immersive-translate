@@ -1,5 +1,7 @@
 import browser from "webextension-polyfill";
 
+import type { PageCommandId } from "./j-types";
+import type { AssistantRequest } from "./k-assistant";
 import type {
   Config,
   ConfigPatch,
@@ -156,6 +158,79 @@ export interface OpenOptionsResult {
   opened: boolean;
 }
 
+export interface AssistantRequestMessage {
+  type: "assistantRequest";
+  request: AssistantRequest;
+}
+
+export interface AssistantResponse {
+  text: string;
+}
+
+export interface GetAssistantCapabilitiesMessage {
+  type: "getAssistantCapabilities";
+  serviceId: string;
+}
+
+export interface AssistantCapabilities {
+  streaming: boolean;
+}
+
+export interface OpenSidePanelMessage {
+  type: "openSidePanel";
+  tabId: number;
+}
+
+export interface OpenSidePanelResult {
+  opened: boolean;
+}
+
+export interface OpenAiWritingMessage {
+  type: "openAiWriting";
+}
+
+export interface GetPageStateMessage {
+  type: "getPageState";
+}
+
+export interface GetSelectionTextMessage {
+  type: "getSelectionText";
+}
+
+export interface SidePanelSelectionMessage {
+  type: "sidePanelSelection";
+  text: string;
+}
+
+export interface ToggleVideoSubtitlePreTranslationMessage {
+  type: "toggleVideoSubtitlePreTranslation";
+  tabId: number;
+}
+
+export type PageTranslationStatus = "idle" | "translating" | "done" | "error";
+
+export interface PageTranslationState {
+  status: PageTranslationStatus;
+  total: number;
+  pending: number;
+  translated: number;
+  errors: number;
+}
+
+export interface PageTranslationStateMessage {
+  type: "pageTranslationState";
+  state: PageTranslationState;
+}
+
+export interface PageTranslationStateAcknowledgement {
+  received: true;
+}
+
+export interface ControllerCommandMessage {
+  type: "pageControllerCommand";
+  command: PageCommandId;
+}
+
 /** Content-to-background port request; the tab id comes from Port.sender. */
 export type TranslatePortMessage = Omit<TranslateMessage, "tabId">;
 
@@ -180,6 +255,16 @@ export type Msg =
   | ClearCacheMessage
   | ValidateRuleMessage
   | OpenOptionsMessage
+  | AssistantRequestMessage
+  | GetAssistantCapabilitiesMessage
+  | OpenSidePanelMessage
+  | OpenAiWritingMessage
+  | GetPageStateMessage
+  | GetSelectionTextMessage
+  | SidePanelSelectionMessage
+  | ToggleVideoSubtitlePreTranslationMessage
+  | PageTranslationStateMessage
+  | ControllerCommandMessage
   | TranslatePortMessage
   | CancelPortMessage;
 
@@ -195,7 +280,11 @@ export type BackgroundRequest =
   | GetCacheStatsMessage
   | ClearCacheMessage
   | ValidateRuleMessage
-  | OpenOptionsMessage;
+  | OpenOptionsMessage
+  | AssistantRequestMessage
+  | GetAssistantCapabilitiesMessage
+  | OpenSidePanelMessage
+  | PageTranslationStateMessage;
 
 /** Acknowledgement for work submitted to a scheduler. */
 export interface TranslateAcknowledgement {
@@ -232,7 +321,15 @@ export type BackgroundResponse<T extends BackgroundRequest> =
                       ? RuleValidationResult
                       : T extends OpenOptionsMessage
                         ? OpenOptionsResult
-                        : never;
+                        : T extends AssistantRequestMessage
+                          ? AssistantResponse
+                          : T extends GetAssistantCapabilitiesMessage
+                            ? AssistantCapabilities
+                            : T extends OpenSidePanelMessage
+                              ? OpenSidePanelResult
+                              : T extends PageTranslationStateMessage
+                                ? PageTranslationStateAcknowledgement
+                                : never;
 
 /** Messages sent directly to a tab's content script. */
 export type TabMessage =
@@ -240,7 +337,12 @@ export type TabMessage =
   | ConfigChangedMessage
   | ToggleTranslateMessage
   | TranslateInputMessage
-  | TranslateSelectionMessage;
+  | TranslateSelectionMessage
+  | OpenAiWritingMessage
+  | GetPageStateMessage
+  | GetSelectionTextMessage
+  | ToggleVideoSubtitlePreTranslationMessage
+  | ControllerCommandMessage;
 
 /** Send a request to the background worker with an inferred response type. */
 export async function sendToBackground<T extends BackgroundRequest>(

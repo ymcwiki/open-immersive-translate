@@ -1,19 +1,4 @@
 import type { Rule } from "../../shared/types";
-import type { AdvancedPageRule } from "../../shared/j-types";
-
-/** Phase-3 defaults consumed by the page controller until shared Rule is widened. */
-export const advancedPageRuleDefaults: Pick<
-  AdvancedPageRule,
-  | "mainFrameMinTextCount"
-  | "likePreSelectors"
-  | "isTransformPreTagNewLine"
-  | "advanceTransformPreTagNewLine"
-> = {
-  mainFrameMinTextCount: 50,
-  likePreSelectors: ["pre"],
-  isTransformPreTagNewLine: false,
-  advanceTransformPreTagNewLine: false,
-};
 
 /** Baseline rule merged beneath built-in and user site rules. */
 export const generalRule: Rule = {
@@ -168,4 +153,8 @@ export const generalRule: Rule = {
   glossaries: [],
   translationMode: "dual",
   theme: "underline",
+  mainFrameMinTextCount: 50,
+  likePreSelectors: ["pre"],
+  isTransformPreTagNewLine: false,
+  advanceTransformPreTagNewLine: false,
 };

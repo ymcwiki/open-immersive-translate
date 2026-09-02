@@ -3,10 +3,10 @@ import {
   runAssistant,
   type AssistantClient,
 } from "../../shared/k-assistant";
-import { withKDefaults } from "../../shared/k-types";
 import type { LangCode } from "../../shared/types";
 import { setUiLocaleOverride, t } from "../../ui/shared/i18n";
 import type { FeatureContext } from "./context";
+import { withKDefaults } from "../../shared/k-types";
 
 interface SelectionPosition {
   left: number;

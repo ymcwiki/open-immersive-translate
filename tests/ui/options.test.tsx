@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/preact";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -144,9 +145,69 @@ describe("Options", () => {
     });
     await waitFor(() => {
       expect(stored.alwaysTranslateLangs).toEqual(["en", "ja"]);
-      expect((stored as unknown as { globalCss: string }).globalCss).toContain(
-        "red",
-      );
+      expect(stored.globalCustomCss).toContain("red");
+    });
+  });
+
+  it("persists phase-three feature, remote-rule, and cache settings", async () => {
+    render(<Options />);
+    await screen.findByRole("heading", { name: "基本", level: 2 });
+
+    fireEvent.click(screen.getByRole("tab", { name: "输入框 / 划词 / 悬停" }));
+    fireEvent.change(screen.getByLabelText("输入框目标语言"), {
+      target: { value: "ja" },
+    });
+    fireEvent.input(screen.getByLabelText("字号"), {
+      target: { value: "30" },
+    });
+    fireEvent.change(screen.getByLabelText("PDF 显示模式"), {
+      target: { value: "translation" },
+    });
+    fireEvent.change(screen.getByLabelText("侧边栏目标语言"), {
+      target: { value: "fr" },
+    });
+    fireEvent.change(screen.getByLabelText("AI 写作目标语言"), {
+      target: { value: "de" },
+    });
+    fireEvent.input(screen.getByLabelText("总结提示词"), {
+      target: { value: "请压缩为三句话" },
+    });
+    const searchCard = screen
+      .getByRole("heading", { name: "搜索增强" })
+      .closest("section");
+    if (!searchCard) throw new Error("找不到搜索增强设置");
+    fireEvent.click(within(searchCard).getByRole("checkbox", { name: "启用" }));
+
+    await waitFor(() => {
+      expect(stored.input.targetLanguage).toBe("ja");
+      expect(stored.subtitle.fontSize).toBe(30);
+      expect(stored.pdf.mode).toBe("translation");
+      expect(stored.sidePanel.targetLanguage).toBe("fr");
+      expect(stored.aiWriting.targetLanguage).toBe("de");
+      expect(stored.aiWriting.prompts.summarize).toBe("请压缩为三句话");
+      expect(stored.searchEnhancement.enabled).toBe(true);
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "站点规则" }));
+    fireEvent.click(screen.getByRole("button", { name: "添加订阅" }));
+    fireEvent.input(screen.getByLabelText("规则 URL 1"), {
+      target: { value: "https://example.com/rules.json" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存订阅" }));
+    await waitFor(() =>
+      expect(stored.remoteRules).toEqual([
+        { url: "https://example.com/rules.json", enabled: true },
+      ]),
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "缓存 / 导入导出" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "启用译文缓存" }));
+    fireEvent.input(screen.getByLabelText("缓存保留天数"), {
+      target: { value: "14" },
+    });
+    await waitFor(() => {
+      expect(stored.cache.enabled).toBe(false);
+      expect(stored.cache.maxAgeDays).toBe(14);
     });
   });
 });

@@ -6,6 +6,7 @@ import type {
   PageTranslationState,
   PageTranslationStateMessage,
 } from "../../shared/j-types";
+import { detectLang } from "../../shared/lang";
 import { sendToBackground, type Msg } from "../../shared/messages";
 import type { Config } from "../../shared/types";
 import type { FeatureContext } from "../features/context";
@@ -13,7 +14,9 @@ import { init as initFloatBall } from "../features/float-ball";
 import { init as initHoverTranslation } from "../features/hover-translate";
 import { init as initInputTranslation } from "../features/input-translate";
 import { init as initSelectionTranslation } from "../features/selection-translate";
-import { init as initYouTubeSubtitles } from "../features/youtube-subtitle";
+import { init as initAiWriting } from "../features/ai-writing";
+import { init as initSearchEnhancement } from "../features/search-enhancement";
+import { initSubtitles } from "../features/subtitle";
 import { onUrlChange } from "../observe/url-change";
 import { isPageCommandId, runPageCommand } from "./commands";
 import { createFrameSync, frameHasEnoughText } from "./frame-sync";
@@ -24,7 +27,7 @@ import { TranslationController } from "./translation-controller";
 export { TranslationController } from "./translation-controller";
 export * from "./commands";
 
-interface ImtPhase3DebugState {
+export interface ImtPhase3DebugState {
   readonly version: "phase3";
   ready: boolean;
   active: boolean;
@@ -32,7 +35,16 @@ interface ImtPhase3DebugState {
   error?: unknown;
 }
 
-function showSelectionTranslation(controller: TranslationController, text: string): void {
+declare global {
+  interface Window {
+    __imt: ImtPhase3DebugState;
+  }
+}
+
+function showSelectionTranslation(
+  controller: TranslationController,
+  text: string,
+): void {
   document.querySelector('[data-imt="context-menu"]')?.remove();
   const host = document.createElement("aside");
   host.dataset.imt = "context-menu";
@@ -41,7 +53,11 @@ function showSelectionTranslation(controller: TranslationController, text: strin
   host.textContent = controllerT("selectionTranslating");
   document.documentElement.append(host);
   void controller
-    .translateText(text, controller.config.sourceLanguage, controller.config.targetLanguage)
+    .translateText(
+      text,
+      controller.config.sourceLanguage,
+      controller.config.targetLanguage,
+    )
     .then((translation) => {
       if (host.isConnected) host.textContent = translation;
     })
@@ -87,14 +103,10 @@ export async function init(): Promise<() => void> {
     runPageCommand(command, controller);
     debugState.active = controller.isTranslated();
   };
-  const frameSync = createFrameSync(
-    window,
-    runCommand,
-    (frameId, state) => {
-      frameStates.set(frameId, state);
-      sendState();
-    },
-  );
+  const frameSync = createFrameSync(window, runCommand, (frameId, state) => {
+    frameStates.set(frameId, state);
+    sendState();
+  });
 
   const mountFeatures = (current: TranslationController): void => {
     for (const dispose of featureDisposers) dispose();
@@ -115,7 +127,9 @@ export async function init(): Promise<() => void> {
       initHoverTranslation(context),
       initSelectionTranslation(context),
       initInputTranslation(context),
-      initYouTubeSubtitles(context),
+      initAiWriting(context),
+      initSearchEnhancement(context),
+      initSubtitles(context),
     ];
   };
 
@@ -131,7 +145,13 @@ export async function init(): Promise<() => void> {
     if (!frameSync.isTop && !frameHasEnoughText(document, minimum)) {
       controller?.destroy();
       controller = undefined;
-      ownState = { status: "idle", total: 0, pending: 0, translated: 0, errors: 0 };
+      ownState = {
+        status: "idle",
+        total: 0,
+        pending: 0,
+        translated: 0,
+        errors: 0,
+      };
       sendState();
       debugState.ready = true;
       debugState.active = false;
@@ -150,15 +170,20 @@ export async function init(): Promise<() => void> {
       controller.update(config, rule);
     }
     mountFeatures(controller);
-    if (!controller.isTranslated() && controller.shouldAutoTranslate()) controller.start();
+    if (!controller.isTranslated() && controller.shouldAutoTranslate())
+      controller.start();
     debugState.ready = true;
     debugState.error = undefined;
     debugState.config = config;
     debugState.active = controller.isTranslated();
   };
 
-  const runtimeListener = (message: unknown): undefined => {
-    if (typeof message !== "object" || message === null || !("type" in message)) {
+  const runtimeListener = (message: unknown): unknown => {
+    if (
+      typeof message !== "object" ||
+      message === null ||
+      !("type" in message)
+    ) {
       return undefined;
     }
     const type = (message as { type: unknown }).type;
@@ -172,10 +197,33 @@ export async function init(): Promise<() => void> {
     }
 
     const incoming = message as Msg;
+    if (incoming.type === "getPageState") {
+      return Promise.resolve({
+        title: document.title,
+        url: location.href,
+        translated: controller?.isTranslated() ?? false,
+        detectedLanguage: detectLang(
+          document.body?.innerText.slice(0, 2_000) ?? "",
+        ),
+      });
+    }
+    if (incoming.type === "getSelectionText") {
+      const active = document.activeElement;
+      const text =
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement
+          ? active.value.slice(
+              active.selectionStart ?? 0,
+              active.selectionEnd ?? 0,
+            )
+          : (window.getSelection()?.toString() ?? "");
+      return Promise.resolve({ text: text.trim() });
+    }
     if (incoming.type === "toggleTranslate" && frameSync.isTop) {
-      const command = incoming.scope === "whole"
-        ? "toggleTranslateTheWholePage"
-        : "toggleTranslateTheMainPage";
+      const command =
+        incoming.scope === "whole"
+          ? "toggleTranslateTheWholePage"
+          : "toggleTranslateTheMainPage";
       runCommand(command);
       frameSync.broadcast(command);
     } else if (incoming.type === "translateInput" && frameSync.isTop) {

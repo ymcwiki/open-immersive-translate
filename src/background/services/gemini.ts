@@ -1,4 +1,5 @@
 import type { LangCode, RateLimit, TranslateRequest } from "../../shared/types";
+import type { AssistantRequest } from "../../shared/k-assistant";
 import {
   BaseService,
   type ServiceTranslateResult,
@@ -22,6 +23,7 @@ import {
 } from "./prompts";
 import { readSse } from "./stream";
 import { supportsPair } from "./mt-utils";
+import { assistantConversation, assistantInstruction } from "./assistant";
 
 export interface GeminiServiceOptions {
   id?: string;
@@ -73,6 +75,11 @@ export class GeminiService extends BaseService {
   private readonly stream: boolean;
   private readonly refusalPatterns: RegExp[];
   private readonly timeoutMs: number;
+  readonly onPartial?: (
+    request: AssistantRequest,
+    emitCumulativeText: (text: string) => void,
+    signal: AbortSignal,
+  ) => Promise<string>;
 
   constructor(options: GeminiServiceOptions = {}) {
     super({
@@ -97,10 +104,94 @@ export class GeminiService extends BaseService {
     this.stream = options.stream ?? false;
     this.refusalPatterns = buildRefusalPatterns(options.ignoreResRegexs);
     this.timeoutMs = options.timeoutMs ?? 101_000;
+    if (this.stream) {
+      this.onPartial = (request, emitCumulativeText, signal) =>
+        this.runAssistant(request, signal, { onPartial: emitCumulativeText });
+    }
   }
 
   override supportsPair(from: LangCode, to: LangCode): boolean {
     return supportsPair(from, to, LANGUAGE_MAPS.ai);
+  }
+
+  async completePrompt(
+    request: AssistantRequest,
+    signal: AbortSignal,
+  ): Promise<string> {
+    return this.runAssistant(request, signal);
+  }
+
+  private async runAssistant(
+    request: AssistantRequest,
+    signal: AbortSignal,
+    options?: TranslationStreamOptions,
+  ): Promise<string> {
+    const method = this.stream ? "streamGenerateContent" : "generateContent";
+    const params = new URLSearchParams();
+    if (this.stream) params.set("alt", "sse");
+    if (this.apiKey) params.set("key", this.apiKey);
+    const query = params.size ? `?${params}` : "";
+    const url = `${this.baseUrl.replace(/\/+$/, "")}/models/${encodeURIComponent(this.model)}:${method}${query}`;
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: assistantInstruction(request) }],
+          },
+          contents: assistantConversation(request).map((message) => ({
+            role: message.role === "assistant" ? "model" : "user",
+            parts: [{ text: message.content }],
+          })),
+          generationConfig: {
+            temperature: this.temperature ?? 0,
+            maxOutputTokens: this.maxTokens,
+          },
+        }),
+      },
+      signal,
+      this.timeoutMs,
+      this.id,
+    );
+    if (!response.ok) throw await responseError(response, this.id);
+
+    const content = this.stream
+      ? await readSse(
+          response,
+          this.id,
+          (event) => {
+            try {
+              return responseText(JSON.parse(event) as GeminiResponse);
+            } catch (error) {
+              throw new TranslateError(
+                "parse",
+                "Gemini stream returned invalid JSON.",
+                { serviceId: this.id, retryable: false, cause: error },
+              );
+            }
+          },
+          options,
+        )
+      : responseText(
+          (await parseJsonResponse(response, this.id)) as GeminiResponse,
+        );
+    if (!content) {
+      throw new TranslateError(
+        "parse",
+        "Gemini response is missing text content.",
+        { serviceId: this.id, retryable: false },
+      );
+    }
+    if (matchesRefusal(content, this.refusalPatterns)) {
+      throw new TranslateError(
+        "refused",
+        "Assistant response matched a refusal pattern.",
+        { serviceId: this.id, retryable: false },
+      );
+    }
+    return content;
   }
 
   async translate(

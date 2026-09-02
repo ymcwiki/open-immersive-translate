@@ -39,6 +39,7 @@ export interface TranslateParagraphsRequest {
   serviceId: string;
   glossary?: GlossaryEntry[];
   context?: TranslationContext;
+  onPartial?(serviceId: string, text: string): void | Promise<void>;
   onResult(batchResults: ParagraphTranslationResult[]): void | Promise<void>;
   signal?: AbortSignal;
 }
@@ -334,11 +335,39 @@ export class TranslationScheduler {
 
     try {
       if (controller.signal.aborted) throw cancellationError(request.serviceId);
-      const { primary, fallback } = await this.resolveServices(
-        request.serviceId,
-      );
+      const supports = (
+        service: TranslationService | undefined,
+      ): service is TranslationService =>
+        Boolean(
+          service &&
+          (service.supportsPair?.(request.from, request.to) ??
+            service.supportsLangs?.(request.from, request.to) ??
+            true),
+        );
+      let { primary, fallback } = await this.resolveServices(request.serviceId);
+      const requestedServiceId = primary.id;
+      if (!supports(primary)) {
+        if (!supports(fallback)) {
+          throw new TranslateError(
+            "invalid_config",
+            `No configured service supports ${request.from} to ${request.to}.`,
+            { serviceId: requestedServiceId, retryable: false },
+          );
+        }
+        primary = fallback;
+        fallback = undefined;
+      } else if (!supports(fallback)) {
+        fallback = undefined;
+      }
       const cacheKeys = request.items.map((item) =>
-        this.cacheKey(primary.id, request.from, request.to, item.text),
+        this.cacheKey(
+          primary.id,
+          request.from,
+          request.to,
+          item.text,
+          request.glossary,
+          request.context,
+        ),
       );
       const cached = await this.cache.getMany(cacheKeys);
       if (controller.signal.aborted) throw cancellationError(primary.id);
@@ -406,6 +435,8 @@ export class TranslationScheduler {
                       request.from,
                       request.to,
                       batch[index].text,
+                      request.glossary,
+                      request.context,
                     ),
                     value: { text: value.text, ts: Date.now() },
                   },
@@ -441,8 +472,14 @@ export class TranslationScheduler {
     from: LangCode,
     to: LangCode,
     text: string,
+    glossary?: GlossaryEntry[],
+    context?: TranslationContext,
   ): TranslationCacheKey {
-    return { serviceId, from, to, text };
+    const variant =
+      glossary?.length || context
+        ? JSON.stringify({ glossary: glossary ?? [], context: context ?? null })
+        : undefined;
+    return { serviceId, from, to, text, ...(variant ? { variant } : {}) };
   }
 
   private queueFor(service: TranslationService): ServiceQueue {
@@ -463,7 +500,7 @@ export class TranslationScheduler {
     texts: string[],
     request: Pick<
       TranslateParagraphsRequest,
-      "from" | "to" | "glossary" | "context"
+      "from" | "to" | "glossary" | "context" | "onPartial"
     >,
     priority: boolean,
     signal: AbortSignal,
@@ -481,6 +518,11 @@ export class TranslationScheduler {
                 context: request.context,
               },
               signal,
+              {
+                onPartial: request.onPartial
+                  ? (text) => request.onPartial?.(service.id, text)
+                  : undefined,
+              },
             ),
           priority,
           signal,

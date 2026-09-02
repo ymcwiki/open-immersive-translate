@@ -1,5 +1,3 @@
-import type { UiLocale } from "../ui/shared/i18n";
-
 const zhCN = {
   title: "翻译本地字幕文件",
   description: "上传 SRT、WebVTT 或 ASS 文件，翻译后预览并下载。",
@@ -41,7 +39,7 @@ const en: Record<SubtitleFileI18nKey, string> = {
 
 export function detectSubtitleFileLocale(
   language = navigator.language,
-): UiLocale {
+): "zh-CN" | "en" {
   return language.toLowerCase().startsWith("en") ? "en" : "zh-CN";
 }
 

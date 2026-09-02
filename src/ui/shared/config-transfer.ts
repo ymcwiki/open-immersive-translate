@@ -1,5 +1,5 @@
-import { configSchema } from "../../shared/config";
-import { withKDefaults, type KConfig } from "../../shared/k-types";
+import { migrateConfig } from "../../shared/config";
+import type { KConfig } from "../../shared/k-types";
 import type { Config } from "../../shared/types";
 
 export type ConfigImportResult =
@@ -27,8 +27,9 @@ export function parseConfigImport(text: string): ConfigImportResult {
     return { ok: false, reason: "invalid-json" };
   }
 
-  const parsed = configSchema.safeParse(value);
-  return parsed.success
-    ? { ok: true, config: withKDefaults(value) }
-    : { ok: false, reason: "invalid-schema" };
+  try {
+    return { ok: true, config: migrateConfig(value) };
+  } catch {
+    return { ok: false, reason: "invalid-schema" };
+  }
 }

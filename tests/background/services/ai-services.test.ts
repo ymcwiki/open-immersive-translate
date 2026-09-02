@@ -26,6 +26,82 @@ afterEach(() => {
 });
 
 describe("phase-3 AI services", () => {
+  it("runs free-form assistant prompts through each native AI adapter", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      const payload = url.includes("anthropic")
+        ? { content: [{ type: "text", text: "Claude answer" }] }
+        : url.includes("generativelanguage")
+          ? {
+              candidates: [{ content: { parts: [{ text: "Gemini answer" }] } }],
+            }
+          : { choices: [{ message: { content: "OpenAI answer" } }] };
+      return Promise.resolve(
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const assistantRequest = {
+      kind: "writing" as const,
+      text: "source text",
+      instruction: "Rewrite precisely",
+      service: "test",
+      history: [{ role: "user" as const, content: "Earlier request" }],
+    };
+
+    const output = await Promise.all([
+      new OpenAICompatibleService().completePrompt(
+        assistantRequest,
+        new AbortController().signal,
+      ),
+      new ClaudeService().completePrompt(
+        assistantRequest,
+        new AbortController().signal,
+      ),
+      new GeminiService().completePrompt(
+        assistantRequest,
+        new AbortController().signal,
+      ),
+    ]);
+
+    expect(output).toEqual(["OpenAI answer", "Claude answer", "Gemini answer"]);
+    for (const [, init] of fetchMock.mock.calls as Array<
+      [string, RequestInit]
+    >) {
+      expect(String(init.body)).toContain("Rewrite precisely");
+      expect(String(init.body)).toContain("Earlier request");
+      expect(String(init.body)).toContain("source text");
+    }
+  });
+
+  it("streams cumulative assistant text only when streaming is enabled", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          sse(
+            { choices: [{ delta: { content: "partial " } }] },
+            { choices: [{ delta: { content: "answer" } }] },
+          ),
+        ),
+    );
+    const service = new OpenAICompatibleService({ stream: true });
+    const partials: string[] = [];
+
+    const output = await service.onPartial?.(
+      { kind: "chat", text: "Question", service: "openai-compatible" },
+      (text) => partials.push(text),
+      new AbortController().signal,
+    );
+
+    expect(new OpenAICompatibleService().onPartial).toBeUndefined();
+    expect(partials).toEqual(["partial ", "partial answer"]);
+    expect(output).toBe("partial answer");
+  });
+
   it("calls Gemini generateContent with a system_instruction and YAML batch", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(

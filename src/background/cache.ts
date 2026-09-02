@@ -10,6 +10,8 @@ export interface TranslationCacheKey {
   from: LangCode;
   to: LangCode;
   text: string;
+  /** Prompt-affecting glossary/context data; omitted for legacy plain requests. */
+  variant?: string;
 }
 
 /** Persisted translation cache value. */
@@ -52,7 +54,8 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
 }
 
 async function cacheHash(key: TranslationCacheKey): Promise<string> {
-  const value = `${key.serviceId}|${key.from}|${key.to}|${key.text}`;
+  const variant = key.variant === undefined ? "" : `|${key.variant}`;
+  const value = `${key.serviceId}|${key.from}|${key.to}|${key.text}${variant}`;
   const digest = await crypto.subtle.digest(
     "SHA-1",
     new TextEncoder().encode(value),

@@ -8,6 +8,7 @@ import type {
   TranslateRequest,
   TranslateResult as ServiceTranslateResult,
 } from "../../shared/types";
+import type { AssistantRequest } from "../../shared/k-assistant";
 
 export type TranslateErrorKind =
   | "network"
@@ -89,6 +90,15 @@ export interface TranslationService {
     signal: AbortSignal,
     options?: TranslationStreamOptions,
   ): Promise<ServiceTranslateResult>;
+  completePrompt?(
+    request: AssistantRequest,
+    signal: AbortSignal,
+  ): Promise<string>;
+  onPartial?(
+    request: AssistantRequest,
+    emitCumulativeText: (text: string) => void,
+    signal: AbortSignal,
+  ): Promise<string>;
 }
 
 export interface TranslationStreamOptions {

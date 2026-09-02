@@ -219,9 +219,11 @@ describe("matchRule", () => {
 
     const remoteOnly = matchRule("https://github.com/openai/codex", [], {
       remoteRules,
+      baseOverrides: { theme: "highlight" },
     });
     expect(remoteOnly.id).toBe("remote-github");
     expect(remoteOnly.selectors).toEqual([".remote-prose"]);
+    expect(remoteOnly.theme).toBe("grey");
 
     const withUser = matchRule("https://github.com/openai/codex", userRules, {
       remoteRules,

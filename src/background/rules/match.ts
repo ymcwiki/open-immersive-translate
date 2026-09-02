@@ -17,7 +17,11 @@ const ADDITIONAL_FIELDS = {
 } as const satisfies Partial<Record<keyof Rule, keyof Rule>>;
 
 const stringArray = z.array(z.string());
-const glossarySchema = z.object({ k: z.string(), v: z.string() });
+const glossarySchema = z.object({
+  k: z.string(),
+  v: z.string(),
+  domain: z.string().optional(),
+});
 
 // Importing the shared configuration module initializes a browser-only
 // polyfill, so the editor-facing validator keeps an equivalent local schema.
@@ -62,11 +66,17 @@ const ruleValidationSchema: z.ZodType<Rule> = z.strictObject({
   theme: z.string().optional(),
   service: z.string().optional(),
   autoTranslate: z.boolean().optional(),
+  mainFrameMinTextCount: z.number().int().nonnegative().optional(),
+  likePreSelectors: stringArray.optional(),
+  isTransformPreTagNewLine: z.boolean().optional(),
+  advanceTransformPreTagNewLine: z.boolean().optional(),
 });
 
 export interface MatchRuleOptions {
   hasSelector?: (selector: string) => boolean;
   remoteRules?: readonly Rule[];
+  /** Global display defaults, merged below every URL-scoped rule. */
+  baseOverrides?: Partial<Rule>;
 }
 
 export interface RuleValidationResult {
@@ -218,6 +228,7 @@ export function matchRule(
 
   return mergeRules(
     generalRule,
+    options.baseOverrides ?? {},
     ...matchingBuiltins,
     ...matchingRemoteRules,
     ...matchingUserRules,

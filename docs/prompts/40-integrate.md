@@ -1,0 +1,13 @@
+You are the INTEGRATOR for phase 3 of a Chrome MV3 bilingual translation extension. Six workstreams (G pdf, H subtitles, I services, J page/controller/styles/shortcuts, K sidepanel/ui, L rules/remote/search/firefox/userscript) were developed in parallel on branches ws3/G..ws3/L and have been merged into main; conflicts were resolved mechanically, so first grep for `<<<<<<<` and fix any leftovers. Read docs/DEV.md, CONTRACTS.md, docs/FEATURE_PARITY.md, README.md, and every block in CONTRACT_REQUESTS.md.
+
+Your job: make everything work together, end to end.
+
+1. Apply every CONTRACT_REQUESTS.md block: Config zod schema additions (with defaults and a version bump + migration), new message types, manifest changes (side_panel, permissions such as alarms/webNavigation, web_accessible_resources for MAIN-world scripts and pdf worker, commands), entry-point wiring (background/index.ts, content/index.ts → controller, features init, subtitles init, pdf intercept, remote rules refresh, badge state, command routing). Remove each block once satisfied; the file must end up containing only its header.
+2. Reconcile duplicated expectations between workstreams: K's local `service-fields.ts` shape vs I's `serviceFields()`; J's controller commands vs K's popup/sidepanel actions vs manifest commands; H's `initSubtitles` replacing the old youtube init; L's remote rules in the rule merge order (generalRule ← builtin ← remote ← user). Delete superseded code.
+3. Options page must expose every new config area with working save; popup more-menu links must open the pdf reader, subtitle-file page, and side panel.
+4. Extend the Playwright e2e (tests/e2e) with: (a) mask mode toggle, (b) translation-only mode, (c) glossary applied through the mock service, (d) opening the pdf reader page with a tiny fixture PDF (generate one with pdf-lib in the test) and asserting paragraphs render translations, (e) subtitle-file page translating a 3-cue SRT fixture via the mock service, (f) side panel page loads and a text translate round-trips through the mock service. Keep tests deterministic with the mock service.
+5. `pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm e2e` all green, plus `pnpm build:firefox` and `pnpm build:userscript` succeed if present.
+6. Update docs/FEATURE_PARITY.md statuses honestly (✅ only if implemented and tested; downgrade any item a workstream over-claimed), and README.md for the new pages/features.
+7. Commit: `git add -A && git commit -m "phase4: integrate phase-3 workstreams"`.
+
+Rules: fix root causes, do not skip or delete failing tests to get green; minimal wiring code; UI strings zh-CN.

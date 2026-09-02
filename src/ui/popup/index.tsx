@@ -262,7 +262,7 @@ export function Popup(): preact.JSX.Element {
         <span>
           {t("popup.shortcut", {
             shortcut:
-              config.shortcuts["toggle-translate"] || t("shortcuts.unknown"),
+              config.shortcuts.toggleTranslatePage || t("shortcuts.unknown"),
           })}
         </span>
       </footer>

@@ -5,9 +5,10 @@ import type {
   PatternModeConfig,
   TranslationThemePatterns,
 } from "../../shared/k-types";
+import { LANGUAGE_CODES } from "../../shared/lang";
 import type { LangCode } from "../../shared/types";
 import { Card, Field, Select, Toggle } from "../shared/components";
-import { serviceName, t } from "../shared/i18n";
+import { languageName, serviceName, t } from "../shared/i18n";
 import type { KConfigUpdater } from "../shared/k-config";
 
 interface ExpandedPanelProps {
@@ -23,6 +24,13 @@ export function ExpandedFeatureCards({
     value: id,
     label: serviceName(id),
   }));
+  const targetLanguageOptions = [
+    { value: "", label: "跟随全局设置" },
+    ...LANGUAGE_CODES.filter((code) => code !== "auto").map((code) => ({
+      value: code,
+      label: languageName(code),
+    })),
+  ];
 
   return (
     <>
@@ -42,6 +50,22 @@ export function ExpandedFeatureCards({
                   input: {
                     ...current.input,
                     triggerMode: triggerMode as KConfig["input"]["triggerMode"],
+                  },
+                }))
+              }
+            />
+          </Field>
+          <Field label="输入框目标语言" htmlFor="input-target-language">
+            <Select
+              id="input-target-language"
+              value={config.input.targetLanguage ?? ""}
+              options={targetLanguageOptions}
+              onChange={(targetLanguage) =>
+                void onPatch((current) => ({
+                  input: {
+                    ...current.input,
+                    targetLanguage: (targetLanguage || undefined) as
+                      LangCode | undefined,
                   },
                 }))
               }
@@ -196,65 +220,129 @@ export function ExpandedFeatureCards({
       </Card>
 
       <Card title={t("features.subtitle")}>
+        <div class="form-stack options-inline-toggles">
+          <Toggle
+            checked={config.subtitle.enabled}
+            label={t("common.enabled")}
+            onChange={(enabled) => patchSubtitle(onPatch, config, { enabled })}
+          />
+          <Toggle
+            checked={config.subtitle.youtube}
+            label="YouTube"
+            onChange={(youtube) => patchSubtitle(onPatch, config, { youtube })}
+          />
+          <Toggle
+            checked={config.subtitle.preTranslation}
+            label="字幕预翻译"
+            onChange={(preTranslation) =>
+              patchSubtitle(onPatch, config, { preTranslation })
+            }
+          />
+        </div>
         <div class="form-grid two-columns">
           <Field label={t("features.subtitleMode")} htmlFor="subtitle-mode">
             <Select
               id="subtitle-mode"
-              value={config.subtitle.style.mode}
+              value={config.subtitle.mode}
               options={[
                 { value: "dual", label: t("mode.dual") },
-                { value: "translation", label: t("mode.translation") },
-                { value: "source", label: t("writing.source") },
+                { value: "translation-only", label: t("mode.translation") },
+                { value: "source-only", label: t("writing.source") },
               ]}
               onChange={(mode) =>
-                void onPatch((current) => ({
-                  subtitle: {
-                    ...current.subtitle,
-                    style: {
-                      ...current.subtitle.style,
-                      mode: mode as KConfig["subtitle"]["style"]["mode"],
-                    },
-                  },
-                }))
+                patchSubtitle(onPatch, config, {
+                  mode: mode as KConfig["subtitle"]["mode"],
+                })
               }
             />
           </Field>
           <NumberField
             id="subtitle-font-size"
             label={t("features.subtitleFontSize")}
-            value={config.subtitle.style.fontSize}
+            value={config.subtitle.fontSize}
             onChange={(fontSize) =>
               patchSubtitle(onPatch, config, { fontSize })
             }
           />
           <TextField
             id="subtitle-color"
-            label={t("features.subtitleColor")}
-            value={config.subtitle.style.color}
-            onChange={(color) => patchSubtitle(onPatch, config, { color })}
+            label="原文颜色"
+            value={config.subtitle.sourceColor}
+            onChange={(sourceColor) =>
+              patchSubtitle(onPatch, config, { sourceColor })
+            }
+          />
+          <TextField
+            id="subtitle-translation-color"
+            label="译文颜色"
+            value={config.subtitle.translationColor}
+            onChange={(translationColor) =>
+              patchSubtitle(onPatch, config, { translationColor })
+            }
           />
           <TextField
             id="subtitle-background"
             label={t("features.subtitleBackground")}
-            value={config.subtitle.style.background}
-            onChange={(background) =>
-              patchSubtitle(onPatch, config, { background })
+            value={config.subtitle.backgroundColor}
+            onChange={(backgroundColor) =>
+              patchSubtitle(onPatch, config, { backgroundColor })
             }
           />
+          <Field label="背景透明度" htmlFor="subtitle-opacity">
+            <input
+              id="subtitle-opacity"
+              type="number"
+              min="0"
+              max="1"
+              step="0.05"
+              value={config.subtitle.backgroundOpacity}
+              onInput={(event) => {
+                const backgroundOpacity = Number(event.currentTarget.value);
+                if (backgroundOpacity >= 0 && backgroundOpacity <= 1) {
+                  patchSubtitle(onPatch, config, { backgroundOpacity });
+                }
+              }}
+            />
+          </Field>
           <Field
             label={t("features.subtitlePosition")}
             htmlFor="subtitle-position"
           >
             <Select
               id="subtitle-position"
-              value={config.subtitle.style.position}
+              value={config.subtitle.position}
               options={[
-                { value: "bottom", label: "Bottom" },
-                { value: "top", label: "Top" },
+                { value: "bottom", label: "底部" },
+                { value: "center", label: "中部" },
+                { value: "top", label: "顶部" },
               ]}
               onChange={(position) =>
                 patchSubtitle(onPatch, config, {
-                  position: position as "top" | "bottom",
+                  position: position as KConfig["subtitle"]["position"],
+                })
+              }
+            />
+          </Field>
+          <Field label="水平偏移" htmlFor="subtitle-offset-x">
+            <input
+              id="subtitle-offset-x"
+              type="number"
+              value={config.subtitle.offsetX}
+              onInput={(event) =>
+                patchSubtitle(onPatch, config, {
+                  offsetX: Number(event.currentTarget.value),
+                })
+              }
+            />
+          </Field>
+          <Field label="垂直偏移" htmlFor="subtitle-offset-y">
+            <input
+              id="subtitle-offset-y"
+              type="number"
+              value={config.subtitle.offsetY}
+              onInput={(event) =>
+                patchSubtitle(onPatch, config, {
+                  offsetY: Number(event.currentTarget.value),
                 })
               }
             />
@@ -265,17 +353,136 @@ export function ExpandedFeatureCards({
       <Card title={t("features.pdf")}>
         <div class="form-stack">
           <Toggle
-            checked={config.pdf.enabled}
-            label={t("common.enabled")}
-            onChange={(enabled) =>
-              void onPatch({ pdf: { ...config.pdf, enabled } })
+            checked={config.pdf.interceptLinks}
+            label={t("features.pdfAutoOpen")}
+            onChange={(interceptLinks) =>
+              void onPatch({ pdf: { ...config.pdf, interceptLinks } })
+            }
+          />
+          <Field label="PDF 显示模式" htmlFor="pdf-mode">
+            <Select
+              id="pdf-mode"
+              value={config.pdf.mode}
+              options={[
+                { value: "dual", label: t("mode.dual") },
+                { value: "translation", label: t("mode.translation") },
+              ]}
+              onChange={(mode) =>
+                void onPatch({
+                  pdf: {
+                    ...config.pdf,
+                    mode: mode as KConfig["pdf"]["mode"],
+                  },
+                })
+              }
+            />
+          </Field>
+          <TextField
+            id="pdf-theme"
+            label="PDF 译文主题"
+            value={config.pdf.theme}
+            onChange={(theme) =>
+              void onPatch({ pdf: { ...config.pdf, theme } })
+            }
+          />
+        </div>
+      </Card>
+
+      <Card title="搜索增强">
+        <Toggle
+          checked={config.searchEnhancement.enabled}
+          label={t("common.enabled")}
+          onChange={(enabled) =>
+            void onPatch({ searchEnhancement: { enabled } })
+          }
+        />
+      </Card>
+
+      <Card title="网页翻译高级设置">
+        <div class="form-stack options-inline-toggles">
+          <Toggle
+            checked={config.translateMainOnly}
+            label="默认只翻译正文"
+            onChange={(translateMainOnly) =>
+              void onPatch({ translateMainOnly })
             }
           />
           <Toggle
-            checked={config.pdf.autoOpenOnline}
-            label={t("features.pdfAutoOpen")}
-            onChange={(autoOpenOnline) =>
-              void onPatch({ pdf: { ...config.pdf, autoOpenOnline } })
+            checked={config.translateToPageEndImmediately}
+            label="立即翻译到页面底部"
+            onChange={(translateToPageEndImmediately) =>
+              void onPatch({ translateToPageEndImmediately })
+            }
+          />
+          <Toggle
+            checked={config.translationMask}
+            label="遮罩模式"
+            onChange={(translationMask) => void onPatch({ translationMask })}
+          />
+          <Toggle
+            checked={config.enableEditTranslation}
+            label="允许编辑译文"
+            onChange={(enableEditTranslation) =>
+              void onPatch({ enableEditTranslation })
+            }
+          />
+          <Toggle
+            checked={config.hoverTranslateDirectly}
+            label="悬停直接翻译"
+            onChange={(hoverTranslateDirectly) =>
+              void onPatch({ hoverTranslateDirectly })
+            }
+          />
+        </div>
+        <div class="form-grid two-columns">
+          <NumberField
+            id="immediate-concurrency"
+            label="立即翻译并发数"
+            value={config.immediateTranslationConcurrency}
+            onChange={(immediateTranslationConcurrency) =>
+              void onPatch({ immediateTranslationConcurrency })
+            }
+          />
+          <NumberField
+            id="main-frame-minimum"
+            label="子框架最少字数"
+            value={config.mainFrameMinTextCount}
+            onChange={(mainFrameMinTextCount) =>
+              void onPatch({ mainFrameMinTextCount })
+            }
+          />
+          <NumberField
+            id="context-word-limit"
+            label="上下文词数上限"
+            value={config.contextWordLimit}
+            onChange={(contextWordLimit) => void onPatch({ contextWordLimit })}
+          />
+          <TextField
+            id="translation-font-size"
+            label="译文字号"
+            value={String(config.translationFontSize ?? "")}
+            onChange={(translationFontSize) =>
+              void onPatch({
+                translationFontSize: translationFontSize || undefined,
+              })
+            }
+          />
+          <TextField
+            id="translation-color"
+            label="译文颜色"
+            value={config.translationColor ?? ""}
+            onChange={(translationColor) =>
+              void onPatch({ translationColor: translationColor || undefined })
+            }
+          />
+          <TextField
+            id="translation-line-height"
+            label="译文行高"
+            value={String(config.translationLineHeight ?? "")}
+            onChange={(translationLineHeight) =>
+              void onPatch({
+                translationLineHeight: translationLineHeight || undefined,
+              })
             }
           />
         </div>
@@ -297,6 +504,22 @@ export function ExpandedFeatureCards({
               options={serviceOptions}
               onChange={(service) =>
                 void onPatch({ sidePanel: { ...config.sidePanel, service } })
+              }
+            />
+          </Field>
+          <Field label="侧边栏目标语言" htmlFor="side-panel-language">
+            <Select
+              id="side-panel-language"
+              value={config.sidePanel.targetLanguage ?? ""}
+              options={targetLanguageOptions}
+              onChange={(targetLanguage) =>
+                void onPatch({
+                  sidePanel: {
+                    ...config.sidePanel,
+                    targetLanguage: (targetLanguage || undefined) as
+                      LangCode | undefined,
+                  },
+                })
               }
             />
           </Field>
@@ -329,6 +552,22 @@ export function ExpandedFeatureCards({
               options={serviceOptions}
               onChange={(service) =>
                 void onPatch({ aiWriting: { ...config.aiWriting, service } })
+              }
+            />
+          </Field>
+          <Field label="AI 写作目标语言" htmlFor="ai-writing-language">
+            <Select
+              id="ai-writing-language"
+              value={config.aiWriting.targetLanguage ?? ""}
+              options={targetLanguageOptions}
+              onChange={(targetLanguage) =>
+                void onPatch({
+                  aiWriting: {
+                    ...config.aiWriting,
+                    targetLanguage: (targetLanguage || undefined) as
+                      LangCode | undefined,
+                  },
+                })
               }
             />
           </Field>
@@ -416,9 +655,9 @@ export function LanguageRuleCards({
           class="rules-editor rules-editor-short"
           aria-label={t("rules.globalCss")}
           spellcheck={false}
-          value={config.globalCss}
+          value={config.globalCustomCss}
           onInput={(event) =>
-            void onPatch({ globalCss: event.currentTarget.value })
+            void onPatch({ globalCustomCss: event.currentTarget.value })
           }
         />
       </Card>
@@ -517,13 +756,10 @@ function JsonField<T extends object>({
 function patchSubtitle(
   onPatch: KConfigUpdater,
   config: KConfig,
-  style: Partial<KConfig["subtitle"]["style"]>,
+  patch: Partial<KConfig["subtitle"]>,
 ): void {
   void onPatch({
-    subtitle: {
-      ...config.subtitle,
-      style: { ...config.subtitle.style, ...style },
-    },
+    subtitle: { ...config.subtitle, ...patch },
   });
 }
 

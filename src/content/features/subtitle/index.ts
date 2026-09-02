@@ -139,10 +139,27 @@ export function initSubtitles(ctx: FeatureContext): () => void {
     }
     return undefined;
   };
+  const onControllerToggle = (): void => {
+    config = { ...config, preTranslation: !config.preTranslation };
+    persistConfig(config);
+    for (const session of sessions.values()) {
+      void session.engine
+        .setPreTranslation(config.preTranslation)
+        .catch(() => undefined);
+    }
+  };
   browser.runtime.onMessage.addListener(onMessage);
+  document.addEventListener(
+    "imt:video-subtitle-pretranslation",
+    onControllerToggle,
+  );
 
   return () => {
     browser.runtime.onMessage.removeListener(onMessage);
+    document.removeEventListener(
+      "imt:video-subtitle-pretranslation",
+      onControllerToggle,
+    );
     disposeBridge();
     for (const unsubscribe of unsubscribers) unsubscribe();
     for (const session of sessions.values()) session.dispose();

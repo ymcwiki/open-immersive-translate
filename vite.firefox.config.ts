@@ -1,4 +1,5 @@
 import { crx, type ManifestV3Export } from "@crxjs/vite-plugin";
+import { fileURLToPath } from "node:url";
 import { defineConfig, type ConfigEnv } from "vite";
 
 import chromeManifest from "./src/manifest.ts";
@@ -86,6 +87,11 @@ export function transformFirefoxManifest(
   delete rest.browser_specific_settings;
   delete rest.side_panel;
   delete rest.sidebar_action;
+  if (Array.isArray(rest.permissions)) {
+    rest.permissions = rest.permissions.filter(
+      (permission) => permission !== "sidePanel",
+    );
+  }
   const currentSettings = isRecord(browserSpecificSettings)
     ? browserSpecificSettings
     : {};
@@ -143,7 +149,21 @@ export default defineConfig(async (env) => {
     build: {
       outDir: "dist-firefox",
       emptyOutDir: false,
-      ...(sidePanelPath ? { rollupOptions: { input: [sidePanelPath] } } : {}),
+      rollupOptions: {
+        input: {
+          pdf: fileURLToPath(new URL("./src/pdf/index.html", import.meta.url)),
+          subtitleFile: fileURLToPath(
+            new URL("./src/subtitle-file/index.html", import.meta.url),
+          ),
+          ...(sidePanelPath
+            ? {
+                sidePanel: fileURLToPath(
+                  new URL(`./${sidePanelPath}`, import.meta.url),
+                ),
+              }
+            : {}),
+        },
+      },
     },
   };
 });

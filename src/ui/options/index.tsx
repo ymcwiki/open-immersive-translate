@@ -2,6 +2,12 @@ import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
 
 import { builtinRules } from "../../background/rules/builtin-rules";
+import {
+  DEFAULT_PROMPTS,
+  getModels,
+  serviceFields,
+  type ServiceFieldDescriptor,
+} from "../../background/services";
 import { LANGUAGE_CODES } from "../../shared/lang";
 import { sendToBackground } from "../../shared/messages";
 import type {
@@ -16,6 +22,7 @@ import { Button, Card, Field, Select, Toggle } from "../shared/components";
 import { parseConfigImport, serializeConfig } from "../shared/config-transfer";
 import {
   languageName,
+  currentUiLocale,
   serviceName,
   setUiLocaleOverride,
   t,
@@ -27,10 +34,6 @@ import {
   getCacheCount,
   testServiceConnection,
 } from "../shared/runtime";
-import {
-  serviceFields,
-  type ServiceFieldDescriptor,
-} from "../shared/service-fields";
 import { ExpandedFeatureCards, LanguageRuleCards } from "./expanded-panels";
 import "../shared/styles.css";
 import "./options.css";
@@ -289,18 +292,34 @@ function BasicPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
 
 function ServicesPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
   const serviceIds = Object.keys(config.services);
+  const [selectedService, setSelectedService] = useState(
+    serviceIds.includes("openai-compatible")
+      ? "openai-compatible"
+      : (serviceIds[0] ?? ""),
+  );
+  const service = config.services[selectedService];
   return (
     <div class="options-stack">
       <p class="ui-status">{t("services.description")}</p>
-      {serviceIds.map((serviceId) => (
+      <Field label="选择服务" htmlFor="service-editor-select">
+        <Select
+          id="service-editor-select"
+          value={selectedService}
+          options={serviceIds.map((serviceId) => ({
+            value: serviceId,
+            label: serviceName(serviceId),
+          }))}
+          onChange={setSelectedService}
+        />
+      </Field>
+      {service ? (
         <ServiceCard
-          key={serviceId}
-          serviceId={serviceId}
-          service={config.services[serviceId]!}
-          serviceIds={serviceIds}
+          key={selectedService}
+          serviceId={selectedService}
+          service={service}
           onPatch={onPatch}
         />
-      ))}
+      ) : null}
     </div>
   );
 }
@@ -308,14 +327,12 @@ function ServicesPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
 interface ServiceCardProps {
   serviceId: string;
   service: ServiceConfig;
-  serviceIds: readonly string[];
   onPatch: KConfigUpdater;
 }
 
 function ServiceCard({
   serviceId,
   service,
-  serviceIds,
   onPatch,
 }: ServiceCardProps): preact.JSX.Element {
   const [showKey, setShowKey] = useState(false);
@@ -372,17 +389,19 @@ function ServiceCard({
       }
     >
       <div class="form-grid two-columns service-fields">
-        {serviceFields(serviceId).map((field) => (
+        {serviceFields(
+          serviceId,
+          currentUiLocale() === "en" ? "en" : "zh-CN",
+        ).map((field) => (
           <ServiceField
-            key={field.key}
+            key={field.name}
             descriptor={field}
             serviceId={serviceId}
             service={service}
-            serviceIds={serviceIds}
             showKey={showKey}
             onToggleKey={() => setShowKey((value) => !value)}
             onChange={(value) =>
-              updateService(serviceFieldPatch(service, field.key, value))
+              updateService(serviceFieldPatch(field.name, value))
             }
           />
         ))}
@@ -410,7 +429,6 @@ function ServiceField({
   descriptor,
   serviceId,
   service,
-  serviceIds,
   showKey,
   onToggleKey,
   onChange,
@@ -418,63 +436,77 @@ function ServiceField({
   descriptor: ServiceFieldDescriptor;
   serviceId: string;
   service: ServiceConfig;
-  serviceIds: readonly string[];
   showKey: boolean;
   onToggleKey: () => void;
   onChange: (value: string) => void;
 }): preact.JSX.Element {
-  const id = `${serviceId}-${descriptor.key.replace(".", "-")}`;
-  const value = serviceFieldValue(service, descriptor.key);
-  const label = t(`services.${descriptor.label}` as I18nKey);
-  if (descriptor.control === "select") {
+  const id = `${serviceId}-${descriptor.name}`;
+  const value = serviceFieldValue(service, descriptor.name);
+  const label = descriptor.label;
+  if (descriptor.type === "checkbox") {
+    return (
+      <Toggle
+        checked={value === "true"}
+        label={label}
+        onChange={(checked) => onChange(String(checked))}
+      />
+    );
+  }
+  if (descriptor.type === "select") {
     return (
       <Field label={label} htmlFor={id}>
         <Select
           id={id}
           value={value}
-          options={[
-            { value: "", label: t("common.none") },
-            ...serviceIds
-              .filter((candidate) => candidate !== serviceId)
-              .map((candidate) => ({
-                value: candidate,
-                label: serviceName(candidate),
-              })),
-          ]}
+          options={(descriptor.options ?? []).map((option) => ({
+            value: option,
+            label: option,
+          }))}
           onChange={onChange}
         />
       </Field>
     );
   }
-  if (descriptor.control === "textarea") {
+  if (descriptor.type === "textarea") {
     return (
       <Field label={label} htmlFor={id}>
         <textarea
           id={id}
+          placeholder={
+            descriptor.name === "promptSystem"
+              ? DEFAULT_PROMPTS.default.system
+              : descriptor.name === "promptUser"
+                ? DEFAULT_PROMPTS.default.user
+                : undefined
+          }
           value={value}
           onInput={(event) => onChange(event.currentTarget.value)}
         />
       </Field>
     );
   }
+  const modelOptions =
+    descriptor.type === "model"
+      ? getModels(serviceId, service.models)
+      : undefined;
   const input = (
     <input
       id={id}
       type={
-        descriptor.control === "password" && showKey
+        descriptor.type === "password" && showKey
           ? "text"
-          : descriptor.control
+          : descriptor.type === "model"
+            ? "text"
+            : descriptor.type
       }
-      min={descriptor.min}
-      step={descriptor.step}
-      placeholder={descriptor.placeholder}
+      list={modelOptions?.length ? `${id}-models` : undefined}
       value={value}
       onInput={(event) => onChange(event.currentTarget.value)}
     />
   );
   return (
     <Field label={label} htmlFor={id}>
-      {descriptor.control === "password" ? (
+      {descriptor.type === "password" ? (
         <div class="password-field">
           {input}
           <button type="button" onClick={onToggleKey}>
@@ -482,7 +514,16 @@ function ServiceField({
           </button>
         </div>
       ) : (
-        input
+        <>
+          {input}
+          {modelOptions?.length ? (
+            <datalist id={`${id}-models`}>
+              {modelOptions.map((model) => (
+                <option key={model} value={model} />
+              ))}
+            </datalist>
+          ) : null}
+        </>
       )}
     </Field>
   );
@@ -490,30 +531,25 @@ function ServiceField({
 
 function serviceFieldValue(
   service: ServiceConfig,
-  key: ServiceFieldDescriptor["key"],
+  key: ServiceFieldDescriptor["name"],
 ): string {
-  if (key === "rateLimit.rps") return String(service.rateLimit?.rps ?? "");
-  if (key === "rateLimit.concurrency") {
-    return String(service.rateLimit?.concurrency ?? "");
-  }
   const value = service[key];
+  if (key === "models") return service.models?.join("\n") ?? "";
   if (key === "headers") return value ? JSON.stringify(value, null, 2) : "";
   return value === undefined ? "" : String(value);
 }
 
 function serviceFieldPatch(
-  service: ServiceConfig,
-  key: ServiceFieldDescriptor["key"],
+  key: ServiceFieldDescriptor["name"],
   value: string,
 ): Partial<ServiceConfig> {
-  if (key === "rateLimit.rps" || key === "rateLimit.concurrency") {
-    const name = key.split(".")[1] as "rps" | "concurrency";
-    const number = value ? Number(value) : undefined;
+  if (key === "stream") return { stream: value === "true" };
+  if (key === "models") {
     return {
-      rateLimit: {
-        ...service.rateLimit,
-        [name]: number && number > 0 ? number : undefined,
-      },
+      models: value
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .filter(Boolean),
     };
   }
   if (key === "headers") {
@@ -533,8 +569,9 @@ function serviceFieldPatch(
     key === "maxBatchSize" ||
     key === "maxBatchChars"
   ) {
-    const number = value ? Number(value) : undefined;
-    return { [key]: number } as Partial<ServiceConfig>;
+    return {
+      [key]: value ? Number(value) : undefined,
+    } as Partial<ServiceConfig>;
   }
   return { [key]: value || undefined } as Partial<ServiceConfig>;
 }
@@ -626,6 +663,28 @@ function RulesPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
     ok: boolean;
     message: string;
   }>();
+  const [remoteRules, setRemoteRules] = useState(config.remoteRules);
+  const [remoteStatus, setRemoteStatus] = useState<string>();
+
+  const saveRemoteRules = async (): Promise<void> => {
+    const valid = remoteRules.every(({ url }) => {
+      try {
+        return ["http:", "https:"].includes(new URL(url).protocol);
+      } catch {
+        return false;
+      }
+    });
+    if (!valid) {
+      setRemoteStatus("规则 URL 必须是有效的 HTTP(S) 地址");
+      return;
+    }
+    try {
+      await onPatch({ remoteRules });
+      setRemoteStatus("远程规则订阅已保存");
+    } catch {
+      setRemoteStatus(t("common.saveFailed"));
+    }
+  };
 
   const validateRules = async (): Promise<void> => {
     let value: unknown;
@@ -715,13 +774,77 @@ function RulesPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
           )}
         </div>
       </Card>
+      <Card title="远程规则订阅">
+        <div class="form-stack">
+          {remoteRules.map((subscription, index) => (
+            <div class="remote-rule-row" key={index}>
+              <input
+                type="url"
+                aria-label={`规则 URL ${index + 1}`}
+                value={subscription.url}
+                onInput={(event) =>
+                  setRemoteRules((current) =>
+                    current.map((item, itemIndex) =>
+                      itemIndex === index
+                        ? { ...item, url: event.currentTarget.value }
+                        : item,
+                    ),
+                  )
+                }
+              />
+              <Toggle
+                checked={subscription.enabled}
+                label="启用"
+                onChange={(enabled) =>
+                  setRemoteRules((current) =>
+                    current.map((item, itemIndex) =>
+                      itemIndex === index ? { ...item, enabled } : item,
+                    ),
+                  )
+                }
+              />
+              <Button
+                variant="quiet"
+                aria-label={`移除远程规则 ${index + 1}`}
+                onClick={() =>
+                  setRemoteRules((current) =>
+                    current.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              >
+                {t("common.remove")}
+              </Button>
+            </div>
+          ))}
+          <div class="rules-actions">
+            <Button
+              onClick={() =>
+                setRemoteRules((current) => [
+                  ...current,
+                  { url: "https://", enabled: true },
+                ])
+              }
+            >
+              添加订阅
+            </Button>
+            <Button variant="primary" onClick={() => void saveRemoteRules()}>
+              保存订阅
+            </Button>
+          </div>
+          {remoteStatus && <p role="status">{remoteStatus}</p>}
+        </div>
+      </Card>
       <LanguageRuleCards config={config} onPatch={onPatch} />
     </div>
   );
 }
 
 function GlossaryPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
-  const updateEntry = (index: number, key: "k" | "v", value: string): void => {
+  const updateEntry = (
+    index: number,
+    key: "k" | "v" | "domain",
+    value: string,
+  ): void => {
     const glossaries = config.glossaries.map((entry, entryIndex) =>
       entryIndex === index ? { ...entry, [key]: value } : entry,
     );
@@ -733,6 +856,7 @@ function GlossaryPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
       <div class="glossary-header" aria-hidden="true">
         <span>{t("glossary.source")}</span>
         <span>{t("glossary.target")}</span>
+        <span>适用域名</span>
         <span />
       </div>
       {config.glossaries.length ? (
@@ -753,6 +877,14 @@ function GlossaryPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
                 value={entry.v}
                 onInput={(event) =>
                   updateEntry(index, "v", event.currentTarget.value)
+                }
+              />
+              <input
+                type="text"
+                aria-label={`适用域名 ${index + 1}`}
+                value={entry.domain ?? ""}
+                onInput={(event) =>
+                  updateEntry(index, "domain", event.currentTarget.value)
                 }
               />
               <Button
@@ -789,8 +921,8 @@ function GlossaryPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
 
 function ShortcutsPanel({ config }: { config: KConfig }): preact.JSX.Element {
   const shortcutLabels: Record<string, I18nKey> = {
-    "toggle-translate": "shortcuts.toggle",
-    "toggle-whole-page": "shortcuts.wholePage",
+    toggleTranslatePage: "shortcuts.toggle",
+    toggleTranslateTheWholePage: "shortcuts.wholePage",
     "translate-input": "shortcuts.input",
   };
   return (
@@ -884,6 +1016,31 @@ function DataPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
   return (
     <div class="options-stack">
       <Card title={t("data.cache")}>
+        <div class="form-grid two-columns">
+          <Toggle
+            checked={config.cache.enabled}
+            label="启用译文缓存"
+            onChange={(enabled) =>
+              void onPatch({ cache: { ...config.cache, enabled } })
+            }
+          />
+          <Field label="缓存保留天数" htmlFor="cache-max-age">
+            <input
+              id="cache-max-age"
+              type="number"
+              min="1"
+              value={config.cache.maxAgeDays}
+              onInput={(event) => {
+                const maxAgeDays = Number(event.currentTarget.value);
+                if (Number.isInteger(maxAgeDays) && maxAgeDays > 0) {
+                  void onPatch({
+                    cache: { ...config.cache, maxAgeDays },
+                  });
+                }
+              }}
+            />
+          </Field>
+        </div>
         <div class="data-row">
           <div>
             <p>

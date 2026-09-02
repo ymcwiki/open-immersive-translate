@@ -1,4 +1,5 @@
 import type { RateLimit, TranslateRequest } from "../../shared/types";
+import type { AssistantRequest } from "../../shared/k-assistant";
 import { BaseService, type ServiceTranslateResult } from "./base";
 
 export interface MockServiceOptions {
@@ -30,6 +31,39 @@ export class MockService extends BaseService {
     signal: AbortSignal,
   ): Promise<ServiceTranslateResult> {
     if (signal.aborted) throw new Error("Translation was cancelled.");
-    return { texts: request.texts.map((text) => `[zh] ${text}`) };
+    return {
+      texts: request.texts.map(
+        (text) => `[zh] ${applyGlossary(text, request.glossary)}`,
+      ),
+    };
   }
+
+  async completePrompt(
+    request: AssistantRequest,
+    signal: AbortSignal,
+  ): Promise<string> {
+    if (signal.aborted) throw new Error("Translation was cancelled.");
+    return `[zh] ${request.text}`;
+  }
+
+  async onPartial(
+    request: AssistantRequest,
+    emitCumulativeText: (text: string) => void,
+    signal: AbortSignal,
+  ): Promise<string> {
+    const text = await this.completePrompt(request, signal);
+    emitCumulativeText(text);
+    return text;
+  }
+}
+
+function applyGlossary(
+  text: string,
+  glossary: TranslateRequest["glossary"],
+): string {
+  return (glossary ?? []).reduce(
+    (current, entry) =>
+      entry.k ? current.split(entry.k).join(entry.v) : current,
+    text,
+  );
 }

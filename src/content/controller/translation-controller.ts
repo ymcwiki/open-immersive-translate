@@ -1,4 +1,3 @@
-import { advancedPageRuleDefaults } from "../../background/rules/defaults";
 import type {
   AdvancedPageConfig,
   AdvancedPageRule,
@@ -20,7 +19,11 @@ import type {
   TranslationMode,
   TranslationPriority,
 } from "../../shared/types";
-import { detectPageLanguage, detectTextLanguage, isParagraphTargetLanguage } from "../extract/language";
+import {
+  detectPageLanguage,
+  detectTextLanguage,
+  isParagraphTargetLanguage,
+} from "../extract/language";
 import { findMainContent } from "../extract/main-area";
 import { joinPreLikeTranslation, splitPreLikeText } from "../extract/pre-like";
 import { extractParagraphs, extractTitle } from "../extract/scanner";
@@ -39,7 +42,10 @@ import {
   setMode as setRenderedMode,
 } from "../render/inject";
 import { controllerT } from "./i18n";
-import { installEditableTranslations, TranslationOverrideStore } from "./editable";
+import {
+  installEditableTranslations,
+  TranslationOverrideStore,
+} from "./editable";
 import { installDirectHoverTranslation } from "./hover-directly";
 import { buildPageContext } from "./page-context";
 import {
@@ -98,17 +104,23 @@ export class TranslationController implements PageControllerActions {
   private readonly errorIds = new Set<string>();
   private readonly requests = new Map<string, PendingRequest>();
   private readonly textWaiters = new Map<string, TextWaiter>();
-  private overrideStore = new TranslationOverrideStore(window.location.hostname);
+  private overrideStore = new TranslationOverrideStore(
+    window.location.hostname,
+  );
   private readonly reportState?: (state: PageTranslationState) => void;
 
-  constructor(config: Config, rule: Rule, options: TranslationControllerOptions = {}) {
+  constructor(
+    config: Config,
+    rule: Rule,
+    options: TranslationControllerOptions = {},
+  ) {
     this.config = config as AdvancedPageConfig;
-    this.rule = { ...advancedPageRuleDefaults, ...rule } as AdvancedPageRule;
+    this.rule = rule as AdvancedPageRule;
     this.scope = this.config.translateMainOnly === false ? "whole" : "main";
     this.immediate = this.config.translateToPageEndImmediately === true;
     this.mask = this.config.translationMask === true;
     this.hoverDirectly = this.config.hoverTranslateDirectly === true;
-    this.videoSubtitlePreTranslation = this.config.videoSubtitlePreTranslation === true;
+    this.videoSubtitlePreTranslation = this.config.subtitle.preTranslation;
     this.reportState = options.reportState;
     this.injectPageStyles();
     setRenderedMask(document, this.mask);
@@ -216,13 +228,13 @@ export class TranslationController implements PageControllerActions {
     const scope = this.scope;
     this.removeAll();
     this.config = config as AdvancedPageConfig;
-    this.rule = { ...advancedPageRuleDefaults, ...rule } as AdvancedPageRule;
+    this.rule = rule as AdvancedPageRule;
     this.overrideStore = new TranslationOverrideStore(window.location.hostname);
     this.pageLanguage = detectPageLanguage(document);
     this.immediate = this.config.translateToPageEndImmediately === true;
     this.mask = this.config.translationMask === true;
     this.hoverDirectly = this.config.hoverTranslateDirectly === true;
-    this.videoSubtitlePreTranslation = this.config.videoSubtitlePreTranslation === true;
+    this.videoSubtitlePreTranslation = this.config.subtitle.preTranslation;
     this.runtimeMode = undefined;
     this.runtimeService = undefined;
     this.injectPageStyles();
@@ -257,10 +269,12 @@ export class TranslationController implements PageControllerActions {
       field instanceof HTMLInputElement ||
       field instanceof HTMLTextAreaElement ||
       (field instanceof HTMLElement && field.isContentEditable)
-    )) return;
-    const text = field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement
-      ? field.value
-      : (field.textContent ?? "");
+    ))
+      return;
+    const text =
+      field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement
+        ? field.value
+        : (field.textContent ?? "");
     if (!text.trim()) return;
     void this.translateText(
       text,
@@ -268,7 +282,10 @@ export class TranslationController implements PageControllerActions {
       this.config.input.targetLanguage ?? this.config.targetLanguage,
     )
       .then((translation) => {
-        if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
+        if (
+          field instanceof HTMLInputElement ||
+          field instanceof HTMLTextAreaElement
+        ) {
           field.value = translation;
         } else {
           field.textContent = translation;
@@ -340,14 +357,21 @@ export class TranslationController implements PageControllerActions {
   }
 
   private currentTheme(): string {
-    return resolveTranslationTheme(this.config, this.rule, window.location.href);
+    return resolveTranslationTheme(
+      this.config,
+      this.rule,
+      window.location.href,
+    );
   }
 
   private injectPageStyles(): void {
-    injectStyles(document, [
-      this.config.globalCustomCss ?? "",
-      ...(this.rule.injectedCss ?? []),
-    ].filter(Boolean));
+    injectStyles(
+      document,
+      [
+        ...(this.rule.injectedCss ?? []),
+        this.config.globalCustomCss ?? "",
+      ].filter(Boolean),
+    );
   }
 
   private installMutationObserver(): void {
@@ -381,13 +405,17 @@ export class TranslationController implements PageControllerActions {
   }
 
   private scanRoot(): Node {
-    if (this.scope === "whole" || this.rule.selectors?.length) return document.body;
+    if (this.scope === "whole" || this.rule.selectors?.length)
+      return document.body;
     return findMainContent(document) ?? document.body;
   }
 
   private async rescan(): Promise<void> {
     if (!this.active || !document.body) return;
-    const found = extractParagraphs(this.scanRoot(), this.extractionRule()) as AdvancedParagraph[];
+    const found = extractParagraphs(
+      this.scanRoot(),
+      this.extractionRule(),
+    ) as AdvancedParagraph[];
     const title = extractTitle(document, this.extractionRule());
     if (title) found.unshift(title as AdvancedParagraph);
     const queued: string[] = [];
@@ -414,13 +442,15 @@ export class TranslationController implements PageControllerActions {
       this.paragraphs.has(paragraph.id) ||
       this.pendingIds.has(paragraph.id) ||
       this.renderedIds.has(paragraph.id)
-    ) return false;
+    )
+      return false;
     const detected = detectTextLanguage(paragraph.text);
     paragraph.lang = detected;
     if (
       this.rule.sameLangCheck !== false &&
       isParagraphTargetLanguage(paragraph.text, this.config.targetLanguage)
-    ) return false;
+    )
+      return false;
     this.paragraphs.set(paragraph.id, paragraph);
     return true;
   }
@@ -451,11 +481,17 @@ export class TranslationController implements PageControllerActions {
         : [];
     });
     if (!paragraphs.length) return;
-    const preformatted = paragraphs.filter((paragraph) => paragraph.preformatted);
+    const preformatted = paragraphs.filter(
+      (paragraph) => paragraph.preformatted,
+    );
     const regular = paragraphs.filter((paragraph) => !paragraph.preformatted);
     await Promise.all([
-      regular.length ? this.requestParagraphs(regular, priority) : Promise.resolve(),
-      ...preformatted.map((paragraph) => this.translatePreformatted(paragraph, priority)),
+      regular.length
+        ? this.requestParagraphs(regular, priority)
+        : Promise.resolve(),
+      ...preformatted.map((paragraph) =>
+        this.translatePreformatted(paragraph, priority),
+      ),
     ]);
   }
 
@@ -502,7 +538,9 @@ export class TranslationController implements PageControllerActions {
     this.emitState();
     try {
       const lines = splitPreLikeText(paragraph.text);
-      const sources = lines.filter((line) => line.text).map((line) => line.text);
+      const sources = lines
+        .filter((line) => line.text)
+        .map((line) => line.text);
       const translations = new Array<string>(sources.length);
       await translateImmediately(
         sources.map((source, index) => ({ source, index })),
@@ -517,7 +555,11 @@ export class TranslationController implements PageControllerActions {
         { concurrency: this.config.immediateTranslationConcurrency ?? 4 },
       );
       if (generation !== this.generation) return;
-      this.renderText(paragraph, joinPreLikeTranslation(lines, translations), false);
+      this.renderText(
+        paragraph,
+        joinPreLikeTranslation(lines, translations),
+        false,
+      );
     } catch {
       if (generation !== this.generation) return;
       this.pendingIds.delete(paragraph.id);
@@ -593,7 +635,8 @@ export class TranslationController implements PageControllerActions {
         const paragraphs = request.message.paragraphs.filter(({ id }) =>
           request.remaining.has(id),
         );
-        if (paragraphs.length) port.postMessage({ ...request.message, paragraphs });
+        if (paragraphs.length)
+          port.postMessage({ ...request.message, paragraphs });
       }
     } catch {
       this.port = undefined;
@@ -609,7 +652,9 @@ export class TranslationController implements PageControllerActions {
     }, RECONNECT_DELAY_MS);
   }
 
-  private post(message: Parameters<ContentTranslatePort["postMessage"]>[0]): void {
+  private post(
+    message: Parameters<ContentTranslatePort["postMessage"]>[0],
+  ): void {
     if (!this.port) {
       if (message.type === "translate") this.connect();
       return;
@@ -693,7 +738,8 @@ export class TranslationController implements PageControllerActions {
         theme: this.currentTheme(),
         wrapperTag: "font",
         prefix:
-          this.rule.wrapperPrefix === "block" || this.rule.wrapperPrefix === "inline"
+          this.rule.wrapperPrefix === "block" ||
+          this.rule.wrapperPrefix === "inline"
             ? this.rule.wrapperPrefix
             : "smart",
         preformatted: paragraph.preformatted,

@@ -1,4 +1,5 @@
 import type { RateLimit, TranslateRequest } from "../../shared/types";
+import type { AssistantRequest } from "../../shared/k-assistant";
 import {
   BaseService,
   type ServiceTranslateResult,
@@ -14,6 +15,7 @@ import {
   requestPromptVariant,
 } from "./prompts";
 import { readSse } from "./stream";
+import { assistantConversation, assistantInstruction } from "./assistant";
 
 export const DEFAULT_SYSTEM_PROMPT = DEFAULT_PROMPTS.default.system;
 export const DEFAULT_USER_PROMPT = DEFAULT_PROMPTS.default.user;
@@ -192,6 +194,11 @@ export class OpenAICompatibleService extends BaseService {
   private readonly refusalPatterns: RegExp[];
   private readonly timeoutMs: number;
   private readonly stream: boolean;
+  readonly onPartial?: (
+    request: AssistantRequest,
+    emitCumulativeText: (text: string) => void,
+    signal: AbortSignal,
+  ) => Promise<string>;
 
   constructor(options: OpenAICompatibleServiceOptions = {}) {
     super({
@@ -217,6 +224,92 @@ export class OpenAICompatibleService extends BaseService {
     this.refusalPatterns = buildRefusalPatterns(options.ignoreResRegexs);
     this.timeoutMs = options.timeoutMs ?? 30_000;
     this.stream = options.stream ?? false;
+    if (this.stream) {
+      this.onPartial = (request, emitCumulativeText, signal) =>
+        this.runAssistant(request, signal, { onPartial: emitCumulativeText });
+    }
+  }
+
+  async completePrompt(
+    request: AssistantRequest,
+    signal: AbortSignal,
+  ): Promise<string> {
+    return this.runAssistant(request, signal);
+  }
+
+  private async runAssistant(
+    request: AssistantRequest,
+    signal: AbortSignal,
+    options?: TranslationStreamOptions,
+  ): Promise<string> {
+    const response = await fetchWithTimeout(
+      joinUrl(this.baseUrl, this.apiPath),
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
+          ...this.headers,
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            { role: "system", content: assistantInstruction(request) },
+            ...assistantConversation(request),
+          ],
+          ...(this.stream ? { stream: true } : {}),
+          ...(this.temperature !== undefined
+            ? { temperature: this.temperature }
+            : {}),
+          ...(this.maxTokens !== undefined
+            ? { max_tokens: this.maxTokens }
+            : {}),
+        }),
+      },
+      signal,
+      this.timeoutMs,
+      this.id,
+    );
+    if (!response.ok) throw await responseError(response, this.id);
+
+    const content = this.stream
+      ? await readSse(
+          response,
+          this.id,
+          (event) => {
+            try {
+              const chunk = JSON.parse(event) as {
+                choices?: Array<{ delta?: { content?: unknown } }>;
+              };
+              const delta = chunk.choices?.[0]?.delta?.content;
+              return typeof delta === "string" ? delta : undefined;
+            } catch (error) {
+              throw new TranslateError(
+                "parse",
+                "OpenAI stream returned invalid JSON.",
+                { serviceId: this.id, retryable: false, cause: error },
+              );
+            }
+          },
+          options,
+        )
+      : ((await parseJsonResponse(response, this.id)) as OpenAIResponse)
+          .choices?.[0]?.message?.content;
+    if (typeof content !== "string") {
+      throw new TranslateError(
+        "parse",
+        "OpenAI response is missing message content.",
+        { serviceId: this.id, retryable: false },
+      );
+    }
+    if (matchesRefusal(content, this.refusalPatterns)) {
+      throw new TranslateError(
+        "refused",
+        "Assistant response matched a refusal pattern.",
+        { serviceId: this.id, retryable: false },
+      );
+    }
+    return content;
   }
 
   async translate(

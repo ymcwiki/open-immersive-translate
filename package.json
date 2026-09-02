@@ -9,7 +9,11 @@
     "e2e": "pnpm build && playwright test",
     "test": "vitest run",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "port:rules": "tsx scripts/port-rules.ts",
+    "build:firefox": "scripts/build-firefox.sh",
+    "lint:firefox": "pnpm build:firefox && scripts/lint-firefox.sh",
+    "build:userscript": "scripts/build-userscript.sh"
   },
   "dependencies": {
     "@fontsource/noto-sans-sc": "^5.3.0",

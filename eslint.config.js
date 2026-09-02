@@ -3,7 +3,13 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "node_modules/**", ".vite/**"],
+    ignores: [
+      "dist/**",
+      "dist-firefox/**",
+      "dist-userscript/**",
+      "node_modules/**",
+      ".vite/**",
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

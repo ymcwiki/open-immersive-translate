@@ -5,7 +5,17 @@ export default defineManifest({
   name: "Bilingual Translator",
   description: "Paragraph-level bilingual web translation.",
   version: "0.0.1",
-  permissions: ["storage", "activeTab", "contextMenus", "scripting", "tabs"],
+  permissions: [
+    "storage",
+    "alarms",
+    "activeTab",
+    "contextMenus",
+    "scripting",
+    "tabs",
+    "webNavigation",
+    "webRequest",
+    "sidePanel",
+  ],
   host_permissions: ["<all_urls>"],
   background: {
     service_worker: "src/background/worker.ts",
@@ -21,23 +31,88 @@ export default defineManifest({
   ],
   web_accessible_resources: [
     {
-      resources: ["src/content/features/youtube-main.ts"],
-      matches: ["*://*.youtube.com/*"],
+      resources: ["src/content/features/subtitle/main-world.ts"],
+      matches: [
+        "*://*.youtube.com/*",
+        "*://*.youtubekids.com/*",
+        "*://*.netflix.com/*",
+        "*://*.primevideo.com/*",
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.disneyplus.com/*",
+        "*://*.max.com/*",
+        "*://*.hbomax.com/*",
+        "*://*.hbogoasia.com/*",
+        "*://*.hbogoasia.tw/*",
+        "*://*.hulu.com/*",
+        "*://*.coursera.org/*",
+        "*://*.udemy.com/*",
+        "*://*.edx.org/*",
+        "*://*.khanacademy.org/*",
+        "*://*.ted.com/*",
+        "*://*.vimeo.com/*",
+        "*://*.linkedin.com/*",
+        "*://*.bilibili.com/*",
+        "*://*.twitter.com/*",
+        "*://*.x.com/*",
+        "*://*.facebook.com/*",
+        "*://*.fb.watch/*",
+        "*://*.dailymotion.com/*",
+      ],
+    },
+    {
+      resources: ["src/pdf/index.html", "assets/pdf.worker.min-*.mjs"],
+      matches: ["<all_urls>"],
     },
   ],
   commands: {
-    "toggle-translate": {
+    toggleTranslatePage: {
       suggested_key: { default: "Alt+A" },
       description: "Toggle page translation",
     },
-    "toggle-whole-page": {
+    toggleTranslateTheWholePage: {
       suggested_key: { default: "Alt+W" },
       description: "Toggle whole-page translation",
     },
+    toggleTranslateTheMainPage: {
+      suggested_key: { default: "Alt+M" },
+      description: "Toggle main-area translation",
+    },
+    toggleOnlyTranslation: {
+      suggested_key: { default: "Alt+T" },
+      description: "Toggle translation-only mode",
+    },
+    toggleTranslateToThePageEndImmediately: {
+      description: "Translate immediately to page end",
+    },
+    toggleTranslationMask: { description: "Toggle translation mask" },
+    toggleMouseHoverTranslateDirectly: {
+      description: "Toggle direct hover translation",
+    },
+    toggleVideoSubtitlePreTranslation: {
+      description: "Toggle video subtitle pre-translation",
+    },
+    translateWithGoogle: { description: "Translate with Google" },
+    translateWithBing: { description: "Translate with Bing" },
+    translateWithDeepL: { description: "Translate with DeepL" },
+    translateWithOpenAI: { description: "Translate with OpenAI" },
+    translateWithClaude: { description: "Translate with Claude" },
+    translateWithGemini: { description: "Translate with Gemini" },
+    translateWithCustom1: { description: "Translate with Custom 1" },
+    translateWithCustom2: { description: "Translate with Custom 2" },
+    translateWithCustom3: { description: "Translate with Custom 3" },
     "translate-input": {
-      suggested_key: { default: "Alt+I" },
       description: "Translate the active input",
     },
+    "toggle-side-panel": {
+      description: "Open the translation side panel",
+    },
+    "open-ai-writing": { description: "Open AI writing" },
+  },
+  side_panel: {
+    default_path: "src/ui/sidepanel/index.html",
   },
   options_page: "options.html",
   action: {

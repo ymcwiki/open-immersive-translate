@@ -1,4 +1,5 @@
 import type { RateLimit, TranslateRequest } from "../../shared/types";
+import type { AssistantRequest } from "../../shared/k-assistant";
 import {
   BaseService,
   type ServiceTranslateResult,
@@ -20,6 +21,7 @@ import {
   requestPromptVariant,
 } from "./prompts";
 import { readSse } from "./stream";
+import { assistantConversation, assistantInstruction } from "./assistant";
 
 export interface ClaudeServiceOptions {
   id?: string;
@@ -61,6 +63,11 @@ export class ClaudeService extends BaseService {
   private readonly refusalPatterns: RegExp[];
   private readonly timeoutMs: number;
   private readonly stream: boolean;
+  readonly onPartial?: (
+    request: AssistantRequest,
+    emitCumulativeText: (text: string) => void,
+    signal: AbortSignal,
+  ) => Promise<string>;
 
   constructor(options: ClaudeServiceOptions = {}) {
     super({
@@ -86,6 +93,98 @@ export class ClaudeService extends BaseService {
     this.refusalPatterns = buildRefusalPatterns(options.ignoreResRegexs);
     this.timeoutMs = options.timeoutMs ?? 30_000;
     this.stream = options.stream ?? false;
+    if (this.stream) {
+      this.onPartial = (request, emitCumulativeText, signal) =>
+        this.runAssistant(request, signal, { onPartial: emitCumulativeText });
+    }
+  }
+
+  async completePrompt(
+    request: AssistantRequest,
+    signal: AbortSignal,
+  ): Promise<string> {
+    return this.runAssistant(request, signal);
+  }
+
+  private async runAssistant(
+    request: AssistantRequest,
+    signal: AbortSignal,
+    options?: TranslationStreamOptions,
+  ): Promise<string> {
+    const url = `${this.baseUrl.replace(/\/+$/, "")}/${this.apiPath.replace(/^\/+/, "")}`;
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "anthropic-version": "2023-06-01",
+          ...(this.apiKey ? { "x-api-key": this.apiKey } : {}),
+          ...this.headers,
+        },
+        body: JSON.stringify({
+          model: this.model,
+          max_tokens: this.maxTokens,
+          system: assistantInstruction(request),
+          messages: assistantConversation(request),
+          ...(this.stream ? { stream: true } : {}),
+          ...(this.temperature !== undefined
+            ? { temperature: this.temperature }
+            : {}),
+        }),
+      },
+      signal,
+      this.timeoutMs,
+      this.id,
+    );
+    if (!response.ok) throw await responseError(response, this.id);
+
+    const content = this.stream
+      ? await readSse(
+          response,
+          this.id,
+          (event) => {
+            try {
+              const chunk = JSON.parse(event) as {
+                type?: string;
+                delta?: { type?: string; text?: unknown };
+              };
+              return chunk.type === "content_block_delta" &&
+                chunk.delta?.type === "text_delta" &&
+                typeof chunk.delta.text === "string"
+                ? chunk.delta.text
+                : undefined;
+            } catch (error) {
+              throw new TranslateError(
+                "parse",
+                "Claude stream returned invalid JSON.",
+                { serviceId: this.id, retryable: false, cause: error },
+              );
+            }
+          },
+          options,
+        )
+      : ((await parseJsonResponse(response, this.id)) as ClaudeResponse).content
+          ?.filter(
+            (block) => block.type === "text" && typeof block.text === "string",
+          )
+          .map((block) => block.text as string)
+          .join("\n");
+    if (!content) {
+      throw new TranslateError(
+        "parse",
+        "Claude response is missing text content.",
+        { serviceId: this.id, retryable: false },
+      );
+    }
+    if (matchesRefusal(content, this.refusalPatterns)) {
+      throw new TranslateError(
+        "refused",
+        "Assistant response matched a refusal pattern.",
+        { serviceId: this.id, retryable: false },
+      );
+    }
+    return content;
   }
 
   async translate(

@@ -7,12 +7,8 @@ export const DEFAULT_PDF_CONFIG: PdfConfig = {
   theme: "underline",
 };
 
-interface ConfigWithPdf extends Config {
-  pdf?: Partial<PdfConfig>;
-}
-
 export function readPdfConfig(config: Config): PdfConfig {
-  const pdf = (config as ConfigWithPdf).pdf;
+  const pdf = (config as Config & { pdf?: Partial<PdfConfig> }).pdf;
   return {
     interceptLinks:
       typeof pdf?.interceptLinks === "boolean"

@@ -5,9 +5,9 @@ import {
   runAssistant,
   type AssistantClient,
 } from "../../../shared/k-assistant";
-import { withKDefaults } from "../../../shared/k-types";
 import { setUiLocaleOverride, t } from "../../../ui/shared/i18n";
 import type { FeatureContext } from "../context";
+import { withKDefaults } from "../../../shared/k-types";
 
 type WritingAction = "summarize" | "polish" | "translate" | "suggestions";
 type EditableTarget = HTMLInputElement | HTMLTextAreaElement | HTMLElement;
