@@ -65,6 +65,14 @@ describe("Popup", () => {
 
     const toggle = await screen.findByRole("button", { name: "翻译" });
     await screen.findByText("example.com");
+    expect(
+      (screen.getByLabelText("翻译服务") as HTMLSelectElement).value,
+    ).toBe("google");
+    expect(stored.services.google).toMatchObject({
+      kind: "google",
+      enabled: true,
+    });
+    expect(stored.services.google?.apiKey).toBeUndefined();
     fireEvent.click(toggle);
 
     await waitFor(() =>
@@ -76,9 +84,9 @@ describe("Popup", () => {
     expect(screen.getByRole("button", { name: "显示原文" })).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("翻译服务"), {
-      target: { value: "google" },
+      target: { value: "deeplx" },
     });
-    await waitFor(() => expect(stored.service).toBe("google"));
+    await waitFor(() => expect(stored.service).toBe("deeplx"));
 
     fireEvent.change(screen.getByLabelText("目标语言"), {
       target: { value: "ja" },

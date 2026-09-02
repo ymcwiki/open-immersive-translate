@@ -3,16 +3,9 @@ import { CustomHttpService } from "./custom-http";
 import { DeepLXService } from "./deeplx";
 import { GoogleService } from "./google";
 import { OpenAICompatibleService } from "./openai-compatible";
+import { MockService } from "./mock";
 import type { TranslationService } from "./base";
 import type { ServiceConfig } from "../../shared/types";
-
-export interface RuntimeServiceConfig extends ServiceConfig {
-  apiPath?: string;
-  temperature?: number;
-  maxTokens?: number;
-  timeoutMs?: number;
-  method?: string;
-}
 
 const services: readonly TranslationService[] = [
   new OpenAICompatibleService(),
@@ -20,6 +13,7 @@ const services: readonly TranslationService[] = [
   new GoogleService(),
   new DeepLXService(),
   new CustomHttpService(),
+  new MockService(),
 ];
 
 const servicesById = new Map(services.map((service) => [service.id, service]));
@@ -37,7 +31,7 @@ export function listServices(): readonly TranslationService[] {
 /** Build an adapter from persisted settings while preserving its configured id. */
 export function createService(
   id: string,
-  config: RuntimeServiceConfig,
+  config: ServiceConfig,
 ): TranslationService {
   const common = {
     id,
@@ -86,6 +80,13 @@ export function createService(
         method: config.method,
         requestBodyTemplate: config.requestBodyTemplate,
         responseJsonPath: config.responseJsonPath,
+      });
+    case "mock":
+      return new MockService({
+        id,
+        maxBatchSize: config.maxBatchSize,
+        maxBatchChars: config.maxBatchChars,
+        rateLimit: config.rateLimit,
       });
   }
 }

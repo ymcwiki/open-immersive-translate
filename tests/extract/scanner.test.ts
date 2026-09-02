@@ -108,17 +108,14 @@ describe("paragraph scanner fixtures", () => {
     ]);
   });
 
-  it("does not merge a navigation bar of thirty links", () => {
+  it("skips a navigation bar of thirty links", () => {
     const links = Array.from(
       { length: 30 },
       (_, index) => `<a href="/${index + 1}">Link ${index + 1}</a>`,
     ).join("");
     const result = texts(`<nav>${links}</nav>`);
 
-    expect(result).toHaveLength(30);
-    expect(result[0]).toBe("Link 1");
-    expect(result[29]).toBe("Link 30");
-    expect(result).not.toContain(links);
+    expect(result).toEqual([]);
   });
 
   it("splits a long br-separated lyrics block into lines", () => {

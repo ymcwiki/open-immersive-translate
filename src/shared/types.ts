@@ -54,10 +54,14 @@ export interface PlaceholderStyle {
   close: string;
 }
 
+/** Scheduler priority for one paragraph. */
+export type TranslationPriority = "normal" | "viewport" | "interactive";
+
 /** Serializable paragraph input sent from a content script to the background. */
 export interface TranslateParagraph {
   id: string;
   text: string;
+  priority?: TranslationPriority;
 }
 
 /** Optional page context available to context-aware translation prompts. */
@@ -85,6 +89,8 @@ export interface TranslationUsage {
 export interface TranslateResult {
   /** Translations in the same order as TranslateRequest.texts. */
   texts: string[];
+  /** Optional errors aligned with `texts`; successful items have no error. */
+  errors?: Array<TranslateError | undefined>;
   detectedLanguage?: LangCode;
   usage?: TranslationUsage;
 }
@@ -137,7 +143,7 @@ export interface TranslationService {
 
 /** Supported adapter families for persisted service configuration. */
 export type ServiceKind =
-  "openai-compatible" | "claude" | "google" | "deeplx" | "custom-http";
+  "openai-compatible" | "claude" | "google" | "deeplx" | "custom-http" | "mock";
 
 /** User-editable settings for one translation service. */
 export interface ServiceConfig {
@@ -147,6 +153,11 @@ export interface ServiceConfig {
   baseUrl?: string;
   model?: string;
   prompt?: string;
+  apiPath?: string;
+  temperature?: number;
+  maxTokens?: number;
+  timeoutMs?: number;
+  method?: string;
   maxBatchSize?: number;
   maxBatchChars?: number;
   rateLimit?: Partial<RateLimit>;
@@ -205,6 +216,7 @@ export interface Rule {
   translationMode?: TranslationMode;
   theme?: string;
   service?: string;
+  autoTranslate?: boolean;
 }
 
 /** Complete local extension configuration. */

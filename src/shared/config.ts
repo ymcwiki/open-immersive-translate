@@ -26,12 +26,18 @@ export const serviceConfigSchema: z.ZodType<ServiceConfig> = z.object({
     "google",
     "deeplx",
     "custom-http",
+    "mock",
   ]),
   enabled: z.boolean().optional(),
   apiKey: z.string().optional(),
   baseUrl: z.string().url().optional(),
   model: z.string().optional(),
   prompt: z.string().optional(),
+  apiPath: z.string().optional(),
+  temperature: z.number().optional(),
+  maxTokens: z.number().int().positive().optional(),
+  timeoutMs: z.number().int().positive().optional(),
+  method: z.string().optional(),
   maxBatchSize: z.number().int().positive().optional(),
   maxBatchChars: z.number().int().positive().optional(),
   rateLimit: rateLimitSchema.optional(),
@@ -84,14 +90,16 @@ export const ruleSchema: z.ZodType<Rule> = z.object({
   translationMode: z.enum(["dual", "translation"]).optional(),
   theme: z.string().optional(),
   service: z.string().optional(),
+  autoTranslate: z.boolean().optional(),
 });
 
 const DEFAULT_SERVICES: Record<string, ServiceConfig> = {
-  "openai-compatible": { kind: "openai-compatible", enabled: true },
+  "openai-compatible": { kind: "openai-compatible", enabled: false },
   claude: { kind: "claude", enabled: false },
-  google: { kind: "google", enabled: false },
+  google: { kind: "google", enabled: true },
   deeplx: { kind: "deeplx", enabled: false },
   "custom-http": { kind: "custom-http", enabled: false },
+  mock: { kind: "mock", enabled: false },
 };
 
 /** Runtime schema for the complete local configuration, including defaults. */
@@ -102,7 +110,7 @@ export const configSchema: z.ZodType<Config> = z.object({
   translationMode: z.enum(["dual", "translation"]).default("dual"),
   theme: z.string().default("underline"),
   font: z.string().optional(),
-  service: z.string().default("openai-compatible"),
+  service: z.string().default("google"),
   services: z.record(z.string(), serviceConfigSchema).default(DEFAULT_SERVICES),
   shortcuts: z.record(z.string(), z.string()).default({
     "toggle-translate": "Alt+A",

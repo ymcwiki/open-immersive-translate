@@ -101,7 +101,136 @@ export function isSameLang(
 
 /** Detect a text's language. */
 export function detectLang(text: string): LangCode {
-  // TODO(phase1:extract): Replace with the selected local language detector.
-  void text;
-  return "auto";
+  const counts = {
+    han: 0,
+    kana: 0,
+    hangul: 0,
+    latin: 0,
+    cyrillic: 0,
+    arabic: 0,
+  };
+
+  for (const character of text) {
+    if (/\p{Script=Hiragana}|\p{Script=Katakana}/u.test(character)) {
+      counts.kana += 1;
+    } else if (/\p{Script=Hangul}/u.test(character)) {
+      counts.hangul += 1;
+    } else if (/\p{Script=Han}/u.test(character)) {
+      counts.han += 1;
+    } else if (/\p{Script=Latin}/u.test(character)) {
+      counts.latin += 1;
+    } else if (/\p{Script=Cyrillic}/u.test(character)) {
+      counts.cyrillic += 1;
+    } else if (/\p{Script=Arabic}/u.test(character)) {
+      counts.arabic += 1;
+    }
+  }
+
+  const scriptTotal = Object.values(counts).reduce(
+    (sum, count) => sum + count,
+    0,
+  );
+  if (scriptTotal < 2) return "auto";
+
+  if (counts.kana / scriptTotal >= 0.05) return "ja";
+  if (counts.hangul / scriptTotal >= 0.2) return "ko";
+  if (counts.han / scriptTotal >= 0.4) return "zh-CN";
+  if (counts.cyrillic / scriptTotal >= 0.4) return "ru";
+  if (counts.arabic / scriptTotal >= 0.4) return "ar";
+  if (counts.latin / scriptTotal < 0.6) return "auto";
+
+  const words = text.toLocaleLowerCase().match(/\p{Script=Latin}+/gu) ?? [];
+  const commonWords: Readonly<Record<"en" | "fr" | "de" | "es", Set<string>>> =
+    {
+      en: new Set([
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "for",
+        "from",
+        "in",
+        "is",
+        "it",
+        "of",
+        "on",
+        "that",
+        "the",
+        "this",
+        "to",
+        "was",
+        "with",
+      ]),
+      fr: new Set([
+        "au",
+        "aux",
+        "avec",
+        "ce",
+        "dans",
+        "de",
+        "des",
+        "du",
+        "elle",
+        "est",
+        "et",
+        "la",
+        "le",
+        "les",
+        "pour",
+        "que",
+        "qui",
+        "un",
+        "une",
+      ]),
+      de: new Set([
+        "auf",
+        "das",
+        "dem",
+        "den",
+        "der",
+        "des",
+        "die",
+        "ein",
+        "eine",
+        "für",
+        "ist",
+        "mit",
+        "nicht",
+        "und",
+        "von",
+        "zu",
+      ]),
+      es: new Set([
+        "al",
+        "con",
+        "de",
+        "del",
+        "el",
+        "en",
+        "es",
+        "la",
+        "las",
+        "los",
+        "para",
+        "por",
+        "que",
+        "se",
+        "un",
+        "una",
+        "y",
+      ]),
+    };
+
+  const scores = (Object.keys(commonWords) as Array<keyof typeof commonWords>)
+    .map((language) => ({
+      language,
+      score: words.filter((word) => commonWords[language].has(word)).length,
+    }))
+    .sort((left, right) => right.score - left.score);
+  if ((scores[0]?.score ?? 0) === 0) return "auto";
+  if (scores[0]?.score === scores[1]?.score) return "auto";
+  return scores[0]?.language ?? "auto";
 }

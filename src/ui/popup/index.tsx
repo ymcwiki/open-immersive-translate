@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import browser from "webextension-polyfill";
 
 import { LANGUAGE_CODES } from "../../shared/lang";
-import { sendToTab } from "../../shared/messages";
+import { sendToBackground, sendToTab } from "../../shared/messages";
 import type { LangCode, TranslationMode } from "../../shared/types";
 import { Button, Field, Select, Toggle } from "../shared/components";
 import { languageName, serviceName, t } from "../shared/i18n";
@@ -189,7 +189,7 @@ export function Popup(): preact.JSX.Element {
       <footer class="popup-footer">
         <button
           type="button"
-          onClick={() => void browser.runtime.openOptionsPage()}
+          onClick={() => void sendToBackground({ type: "openOptions" })}
         >
           {t("popup.settings")}
         </button>

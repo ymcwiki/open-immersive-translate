@@ -2,12 +2,14 @@ import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
 
 import { builtinRules } from "../../background/rules/builtin-rules";
-import { ruleSchema } from "../../shared/config";
 import { LANGUAGE_CODES } from "../../shared/lang";
+import { sendToBackground } from "../../shared/messages";
 import type {
   Config,
   ConfigPatch,
+  JsonValue,
   LangCode,
+  Rule,
   ServiceConfig,
   TranslationMode,
 } from "../../shared/types";
@@ -552,22 +554,37 @@ function RulesPanel({ config, onPatch }: PanelProps): preact.JSX.Element {
       return;
     }
 
-    const result = ruleSchema.array().safeParse(value);
-    if (!result.success) {
-      const issue = result.error.issues[0];
-      const detail = issue
-        ? `${issue.path.join(".") || "[]"}: ${issue.message}`
-        : "";
+    if (!Array.isArray(value)) {
       setValidation({
         ok: false,
-        message: t("rules.invalidSchema", { detail }),
+        message: t("rules.invalidSchema", { detail: "[]: Expected an array" }),
+      });
+      return;
+    }
+
+    const results = await Promise.all(
+      value.map((rule) =>
+        sendToBackground({
+          type: "validateRule",
+          rule: rule as JsonValue,
+        }),
+      ),
+    );
+    const invalid = results.find((result) => !result.ok);
+    if (invalid) {
+      setValidation({
+        ok: false,
+        message: t("rules.invalidSchema", {
+          detail: invalid.errors[0] ?? "Invalid rule",
+        }),
       });
       return;
     }
 
     try {
-      await onPatch({ userRules: result.data });
-      setRuleText(JSON.stringify(result.data, null, 2));
+      const rules = value as Rule[];
+      await onPatch({ userRules: rules });
+      setRuleText(JSON.stringify(rules, null, 2));
       setValidation({ ok: true, message: t("rules.valid") });
     } catch {
       setValidation({ ok: false, message: t("common.saveFailed") });

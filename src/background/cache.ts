@@ -269,6 +269,19 @@ export class TranslationCache {
       this.useMemory();
     }
   }
+
+  async count(): Promise<number> {
+    if (!this.databaseFactory) return this.memory.size;
+
+    try {
+      const database = await this.openDatabase();
+      const transaction = database.transaction(STORE_NAME, "readonly");
+      return await requestResult(transaction.objectStore(STORE_NAME).count());
+    } catch {
+      this.useMemory();
+      return this.memory.size;
+    }
+  }
 }
 
 export const translationCache = new TranslationCache();
@@ -298,4 +311,8 @@ export async function cleanupTranslationCache(
 
 export async function clearTranslationCache(): Promise<void> {
   await translationCache.clear();
+}
+
+export async function getTranslationCacheCount(): Promise<number> {
+  return translationCache.count();
 }

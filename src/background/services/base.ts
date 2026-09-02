@@ -6,7 +6,7 @@ import type {
   TranslateError as SerializedTranslateError,
   TranslateErrorCode,
   TranslateRequest,
-  TranslateResult,
+  TranslateResult as ServiceTranslateResult,
 } from "../../shared/types";
 
 export type TranslateErrorKind =
@@ -72,10 +72,7 @@ export class TranslateError extends Error implements SerializedTranslateError {
   }
 }
 
-/** Local result extension used until aligned item errors enter the shared contract. */
-export interface ServiceTranslateResult extends TranslateResult {
-  errors?: Array<TranslateError | undefined>;
-}
+export type { ServiceTranslateResult };
 
 /** Background adapter contract; kept structurally identical to the shared contract. */
 export interface TranslationService {

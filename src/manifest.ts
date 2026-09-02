@@ -8,7 +8,7 @@ export default defineManifest({
   permissions: ["storage", "activeTab", "contextMenus", "scripting", "tabs"],
   host_permissions: ["<all_urls>"],
   background: {
-    service_worker: "src/background/index.ts",
+    service_worker: "src/background/worker.ts",
     type: "module",
   },
   content_scripts: [
@@ -17,6 +17,12 @@ export default defineManifest({
       js: ["src/content/index.ts"],
       run_at: "document_idle",
       all_frames: true,
+    },
+  ],
+  web_accessible_resources: [
+    {
+      resources: ["src/content/features/youtube-main.ts"],
+      matches: ["*://*.youtube.com/*"],
     },
   ],
   commands: {

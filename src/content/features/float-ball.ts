@@ -1,5 +1,6 @@
 import browser from "webextension-polyfill";
 
+import { sendToBackground } from "../../shared/messages";
 import type { FeatureContext } from "./context";
 
 export const FLOAT_BALL_POSITION_KEY = "floatBallPos";
@@ -201,17 +202,15 @@ export function init(ctx: FeatureContext): () => void {
     closeMenu();
 
     if (action === "settings") {
-      void browser.runtime.openOptionsPage().catch(() => undefined);
+      void sendToBackground({ type: "openOptions" }).catch(() => undefined);
       return;
     }
 
     if (action === "translation-only") {
-      void browser.runtime
-        .sendMessage({
-          type: "setConfig",
-          patch: { translationMode: "translation" },
-        })
-        .catch(() => undefined);
+      void sendToBackground({
+        type: "setConfig",
+        patch: { translationMode: "translation" },
+      }).catch(() => undefined);
       if (!ctx.isTranslated()) ctx.toggleTranslate();
       button.setAttribute("aria-pressed", "true");
       return;
@@ -222,12 +221,10 @@ export function init(ctx: FeatureContext): () => void {
       const neverTranslateSites = Array.from(
         new Set([...ctx.config.neverTranslateSites, hostname]),
       );
-      void browser.runtime
-        .sendMessage({
-          type: "setConfig",
-          patch: { neverTranslateSites },
-        })
-        .catch(() => undefined);
+      void sendToBackground({
+        type: "setConfig",
+        patch: { neverTranslateSites },
+      }).catch(() => undefined);
       if (ctx.isTranslated()) ctx.toggleTranslate();
       button.setAttribute("aria-pressed", "false");
     }

@@ -3,10 +3,16 @@ import browser from "webextension-polyfill";
 import type {
   Config,
   ConfigPatch,
+  GlossaryEntry,
+  JsonValue,
   LangCode,
+  PlaceholderStyle,
   Rule,
+  ServiceConfig,
+  ServiceKind,
   TranslateError,
   TranslateParagraph,
+  TranslationContext,
 } from "./types";
 
 /** Request the merged rule for a document URL. */
@@ -24,6 +30,8 @@ export interface TranslateMessage {
   from: LangCode;
   to: LangCode;
   service?: string;
+  glossary?: GlossaryEntry[];
+  context?: TranslationContext;
   priority?: "normal" | "viewport" | "interactive";
 }
 
@@ -63,6 +71,7 @@ export interface SetConfigMessage {
 /** Notify extension contexts that configuration changed. */
 export interface ConfigChangedMessage {
   type: "configChanged";
+  config?: Config;
 }
 
 /** Toggle content translation for the main region or whole page. */
@@ -76,6 +85,75 @@ export interface ToggleTranslateMessage {
 export interface TranslateInputMessage {
   type: "translateInput";
   tabId: number;
+}
+
+/** Translate text supplied by the browser selection context menu. */
+export interface TranslateSelectionMessage {
+  type: "translateSelection";
+  tabId: number;
+  text: string;
+}
+
+/** List translation services available to the current configuration. */
+export interface GetServicesMessage {
+  type: "getServices";
+}
+
+export interface ServiceInfo {
+  id: string;
+  name: string;
+  kind: ServiceKind;
+  enabled: boolean;
+  placeholder: PlaceholderStyle;
+}
+
+/** Check one adapter with its unsaved or persisted settings. */
+export interface TestServiceMessage {
+  type: "testService";
+  serviceId: string;
+  config?: ServiceConfig;
+}
+
+export interface ServiceTestResult {
+  ok: boolean;
+  message?: string;
+}
+
+/** Read and clear translation-cache metadata. */
+export interface GetCacheStatsMessage {
+  type: "getCacheStats";
+}
+
+export interface ClearCacheMessage {
+  type: "clearCache";
+}
+
+export interface CacheStatsResult {
+  count: number;
+}
+
+export interface ClearCacheResult {
+  cleared: number;
+}
+
+/** Validate one site-rule object or JSON string. */
+export interface ValidateRuleMessage {
+  type: "validateRule";
+  rule: JsonValue | string;
+}
+
+export interface RuleValidationResult {
+  ok: boolean;
+  errors: string[];
+}
+
+/** Open the extension options page from a content or UI context. */
+export interface OpenOptionsMessage {
+  type: "openOptions";
+}
+
+export interface OpenOptionsResult {
+  opened: boolean;
 }
 
 /** Content-to-background port request; the tab id comes from Port.sender. */
@@ -95,6 +173,13 @@ export type Msg =
   | ConfigChangedMessage
   | ToggleTranslateMessage
   | TranslateInputMessage
+  | TranslateSelectionMessage
+  | GetServicesMessage
+  | TestServiceMessage
+  | GetCacheStatsMessage
+  | ClearCacheMessage
+  | ValidateRuleMessage
+  | OpenOptionsMessage
   | TranslatePortMessage
   | CancelPortMessage;
 
@@ -104,7 +189,13 @@ export type BackgroundRequest =
   | TranslateMessage
   | CancelMessage
   | GetConfigMessage
-  | SetConfigMessage;
+  | SetConfigMessage
+  | GetServicesMessage
+  | TestServiceMessage
+  | GetCacheStatsMessage
+  | ClearCacheMessage
+  | ValidateRuleMessage
+  | OpenOptionsMessage;
 
 /** Acknowledgement for work submitted to a scheduler. */
 export interface TranslateAcknowledgement {
@@ -129,14 +220,27 @@ export type BackgroundResponse<T extends BackgroundRequest> =
           ? Config
           : T extends SetConfigMessage
             ? Config
-            : never;
+            : T extends GetServicesMessage
+              ? ServiceInfo[]
+              : T extends TestServiceMessage
+                ? ServiceTestResult
+                : T extends GetCacheStatsMessage
+                  ? CacheStatsResult
+                  : T extends ClearCacheMessage
+                    ? ClearCacheResult
+                    : T extends ValidateRuleMessage
+                      ? RuleValidationResult
+                      : T extends OpenOptionsMessage
+                        ? OpenOptionsResult
+                        : never;
 
 /** Messages sent directly to a tab's content script. */
 export type TabMessage =
   | TranslateResultMessage
   | ConfigChangedMessage
   | ToggleTranslateMessage
-  | TranslateInputMessage;
+  | TranslateInputMessage
+  | TranslateSelectionMessage;
 
 /** Send a request to the background worker with an inferred response type. */
 export async function sendToBackground<T extends BackgroundRequest>(

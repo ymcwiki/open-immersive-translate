@@ -1,11 +1,6 @@
-import browser from "webextension-polyfill";
-
+import { sendToBackground } from "../../shared/messages";
+import type { ServiceTestResult } from "../../shared/messages";
 import type { ServiceConfig } from "../../shared/types";
-
-export interface ServiceTestResult {
-  ok: boolean;
-  message?: string;
-}
 
 interface CacheStatsResult {
   count: number;
@@ -15,12 +10,11 @@ interface ClearCacheResult {
   cleared: number;
 }
 
-/** Temporary UI adapter pending typed phase-1 background message contracts. */
 export async function testServiceConnection(
   serviceId: string,
   config: ServiceConfig,
 ): Promise<ServiceTestResult | undefined> {
-  const response: unknown = await browser.runtime.sendMessage({
+  const response: unknown = await sendToBackground({
     type: "testService",
     serviceId,
     config,
@@ -34,14 +28,14 @@ export async function testServiceConnection(
 }
 
 export async function getCacheCount(): Promise<number | undefined> {
-  const response: unknown = await browser.runtime.sendMessage({
+  const response: unknown = await sendToBackground({
     type: "getCacheStats",
   });
   return isCacheStats(response) ? response.count : undefined;
 }
 
 export async function clearCache(): Promise<number | undefined> {
-  const response: unknown = await browser.runtime.sendMessage({
+  const response: unknown = await sendToBackground({
     type: "clearCache",
   });
   return isClearCacheResult(response) ? response.cleared : undefined;

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Translation smoke test</title>
+  </head>
+  <body>
+    <nav aria-label="Primary navigation">
+      <a href="#first">First</a>
+      <a href="#second">Second</a>
+      <a href="#third">Third</a>
+    </nav>
+    <main>
+      <article>
+        <p id="first">This is the first paragraph in the local article.</p>
+        <p id="second">
+          The second paragraph has <strong>important inline text</strong> to
+          preserve.
+        </p>
+        <p id="third">The final paragraph ends the translation smoke test.</p>
+        <pre><code>const untranslated = "code block";</code></pre>
+      </article>
+    </main>
+  </body>
+</html>

@@ -15,6 +15,7 @@ describe("service registry", () => {
       "google",
       "deeplx",
       "custom-http",
+      "mock",
     ]);
     expect(getService("google")?.placeholder).toEqual({
       open: "<b>",

@@ -10,6 +10,7 @@ import type {
   TranslateParagraph,
   TranslationContext,
 } from "../shared/types";
+import { loadConfig } from "../shared/config";
 import { translationCache, type TranslationCacheKey } from "./cache";
 import type { TranslationCache } from "./cache";
 import {
@@ -22,7 +23,10 @@ import { createService, getService } from "./services";
 
 const RETRY_DELAY_MS = 250;
 
-export interface SchedulerParagraph extends TranslateParagraph {
+export interface SchedulerParagraph extends Omit<
+  TranslateParagraph,
+  "priority"
+> {
   priority?: boolean;
 }
 
@@ -239,9 +243,7 @@ export class TranslationScheduler {
       this.injectedServices.set(service.id, service);
     }
     this.fallbackServices = options.fallbackServices ?? {};
-    this.configProvider =
-      options.configProvider ??
-      (async () => (await import("../shared/config")).loadConfig());
+    this.configProvider = options.configProvider ?? loadConfig;
   }
 
   async translate(
@@ -258,11 +260,15 @@ export class TranslationScheduler {
         items: request.paragraphs.map((paragraph) => ({
           ...paragraph,
           priority:
-            request.priority !== undefined && request.priority !== "normal",
+            paragraph.priority !== undefined
+              ? paragraph.priority !== "normal"
+              : request.priority !== undefined && request.priority !== "normal",
         })),
         from: request.from,
         to: request.to,
         serviceId,
+        glossary: request.glossary,
+        context: request.context,
         onResult: (results) => {
           for (const result of results) delivered.add(result.id);
           emit({
@@ -423,7 +429,9 @@ export class TranslationScheduler {
     } finally {
       request.signal?.removeEventListener("abort", externalAbort);
       const tabRequests = this.operations.get(request.tabId);
-      tabRequests?.delete(operationId);
+      if (tabRequests?.get(operationId) === controller) {
+        tabRequests.delete(operationId);
+      }
       if (!tabRequests?.size) this.operations.delete(request.tabId);
     }
   }
@@ -520,6 +528,13 @@ export class TranslationScheduler {
 
     const config = await this.configProvider();
     const serviceConfig = config.services[serviceId];
+    if (serviceConfig && serviceConfig.enabled !== true) {
+      throw new TranslateError(
+        "invalid_config",
+        `Translation service ${serviceId} is disabled.`,
+        { serviceId, retryable: false },
+      );
+    }
     const primary = serviceConfig
       ? createService(serviceId, serviceConfig)
       : getService(serviceId);
@@ -551,6 +566,17 @@ export async function translateParagraphs(
   request: TranslateParagraphsRequest,
 ): Promise<void> {
   await defaultScheduler.translateParagraphs(request);
+}
+
+export async function translate(
+  request: TranslateMessage,
+  emit: TranslateResultEmitter,
+): Promise<void> {
+  await defaultScheduler.translate(request, emit);
+}
+
+export function cancel(tabId: number, requestId?: string): void {
+  defaultScheduler.cancel(tabId, requestId);
 }
 
 export function cancelTab(tabId: number): void {

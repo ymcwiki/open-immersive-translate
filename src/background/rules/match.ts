@@ -61,6 +61,7 @@ const ruleValidationSchema: z.ZodType<Rule> = z.strictObject({
   translationMode: z.enum(["dual", "translation"]).optional(),
   theme: z.string().optional(),
   service: z.string().optional(),
+  autoTranslate: z.boolean().optional(),
 });
 
 export interface MatchRuleOptions {
