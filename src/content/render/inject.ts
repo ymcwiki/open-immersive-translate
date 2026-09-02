@@ -17,13 +17,30 @@ export type TranslationTheme =
   | "grey"
   | "dividingLine"
   | "wavy"
-  | "marker";
+  | "marker"
+  | "dashedBorder"
+  | "solidBorder"
+  | "thinDashed"
+  | "nativeUnderline"
+  | "nativeDashed"
+  | "nativeDotted"
+  | "weakening"
+  | "blur";
+
+export interface TargetStyleOptions {
+  font?: string;
+  fontSize?: string | number;
+  color?: string;
+  lineHeight?: string | number;
+}
 
 export interface RenderTranslationOptions {
   mode: TranslationMode;
   theme: string;
   wrapperTag: "font";
   prefix: "smart" | "block" | "inline";
+  style?: TargetStyleOptions;
+  preformatted?: boolean;
 }
 
 interface SourceElementState {
@@ -267,6 +284,30 @@ function createTarget(paragraph: Paragraph, dataImt: string): HTMLElement {
   return target;
 }
 
+function cssValue(
+  value: string | number | undefined,
+  numberUnit = "",
+): string | undefined {
+  if (value === undefined || value === "") return undefined;
+  return typeof value === "number" ? `${value}${numberUnit}` : value;
+}
+
+/** Apply user-controlled target typography through extension CSS variables. */
+export function applyTargetStyle(
+  target: HTMLElement,
+  options: TargetStyleOptions = {},
+): void {
+  const values: Array<[string, string | undefined]> = [
+    ["--imt-target-font", cssValue(options.font)],
+    ["--imt-target-font-size", cssValue(options.fontSize, "px")],
+    ["--imt-target-color", cssValue(options.color)],
+    ["--imt-target-line-height", cssValue(options.lineHeight)],
+  ];
+  for (const [property, value] of values) {
+    if (value !== undefined) target.style.setProperty(property, value);
+  }
+}
+
 /** Insert a translated fragment at the end of its paragraph container. */
 export function renderTranslation(
   paragraph: Paragraph,
@@ -278,8 +319,10 @@ export function renderTranslation(
     options.wrapperTag,
   );
   target.classList.add("imt-target", `imt-theme-${options.theme}`);
+  if (options.preformatted) target.classList.add("imt-preformatted");
   target.dataset.imt = "target";
   target.append(fragment);
+  applyTargetStyle(target, options.style);
   appendTarget(paragraph, target, options.prefix, state);
   applyMode(state, options.mode);
   return target;
@@ -387,6 +430,17 @@ export function setMode(
       applyMode(state, mode);
     }
   }
+}
+
+/** Toggle learning-mode blur without changing the selected translation theme. */
+export function setMask(root: Document | ShadowRoot | Element, enabled: boolean): void {
+  const element =
+    root instanceof Document
+      ? root.documentElement
+      : root instanceof ShadowRoot
+        ? root.host
+        : root;
+  element.classList.toggle("imt-translation-mask", enabled);
 }
 
 /** Store the paragraph id on its source container. */
