@@ -1,0 +1,12 @@
+You are finishing a Chrome MV3 bilingual translation extension. Read docs/FEATURE_PARITY.md, CONTRACTS.md, README.md and skim src/. Nine items are marked 🔧 (partial). Close the six that are verifiable locally, fully, with tests:
+
+- A30 badge: background keeps per-tab page state from the content controller (idle/translating/done/error + counts) and sets chrome.action badge text/color; clears on navigation; unit-test the state→badge mapping and the message handler with a mocked chrome.action.
+- C2 shortcuts: every command in the manifest commands block (toggleOnlyTranslation, toggleTranslateToThePageEndImmediately, toggleTranslationMask, toggleMouseHoverTranslateDirectly, toggleVideoSubtitlePreTranslation, toggleSidePanel, translateInputBox, openAiWritingModal) must be routed from chrome.commands.onCommand → the active tab's controller/feature action, and the Options 快捷键 tab must list all of them with their current bindings (chrome.commands.getAll) and a link to chrome://extensions/shortcuts. Test the routing table.
+- C5 popup more-menu: every entry works: 设置, 快捷键, 清除缓存 (with count + confirmation), 反馈, 打开侧边栏, 翻译本地 PDF, 翻译字幕文件, 导出/导入配置 shortcut. Component tests for each action's dispatched message.
+- C7 context menus: 翻译网页 (toggle), 翻译选中文本 (opens the selection panel with the selection), 翻译本地 PDF, 翻译字幕文件, 打开侧边栏; created on install and update; tests for creation and click routing.
+- D17 test connection: background handler that runs a tiny translate request ("Hello") through the selected service with the user's credentials and returns {ok, latencyMs, sample | error}; Options shows the result inline for every service card; tests with mocked fetch (success, auth error, timeout).
+- D20 language pair support: the scheduler consults service.supportsPair(from,to) and, when unsupported, skips to the fallback service (or reports a clear error when none); Options shows an inline warning when the selected pair is unsupported by the chosen service. Tests for scheduler skip and for at least three providers' code mappings.
+
+For E4/E5/E6 (streaming/course/social subtitle adapters that cannot be verified offline): leave 🔧 but make sure each adapter has a parser unit test on a realistic captured-format fixture and a note in docs/FEATURE_PARITY.md saying what remains unverified.
+
+Then: `pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm e2e && pnpm build:firefox && pnpm build:userscript` all green; update docs/FEATURE_PARITY.md (✅ only when implemented and tested) and README; commit `phase5: close partial items`.
