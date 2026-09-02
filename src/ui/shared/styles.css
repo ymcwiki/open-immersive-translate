@@ -1,0 +1,239 @@
+:root {
+  color-scheme: light dark;
+  --ui-bg: #f6f7f9;
+  --ui-panel: #ffffff;
+  --ui-panel-muted: #f0f2f5;
+  --ui-text: #17191d;
+  --ui-muted: #676d78;
+  --ui-border: #d9dde4;
+  --ui-accent: #2667d8;
+  --ui-accent-hover: #1d56ba;
+  --ui-accent-soft: #e8f0ff;
+  --ui-danger: #b42318;
+  --ui-success: #18794e;
+  --ui-shadow: 0 1px 2px rgb(16 24 40 / 7%);
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-size: 13px;
+  color: var(--ui-text);
+  background: var(--ui-bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ui-bg: #17191d;
+    --ui-panel: #22252b;
+    --ui-panel-muted: #2b2f36;
+    --ui-text: #f2f4f7;
+    --ui-muted: #a8afb9;
+    --ui-border: #3b4049;
+    --ui-accent: #78a8ff;
+    --ui-accent-hover: #94b9ff;
+    --ui-accent-soft: #243c65;
+    --ui-danger: #ff8a80;
+    --ui-success: #75d6a9;
+    --ui-shadow: 0 1px 2px rgb(0 0 0 / 30%);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--ui-text);
+  background: var(--ui-bg);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+select,
+input,
+textarea {
+  color: var(--ui-text);
+}
+
+select,
+input[type="text"],
+input[type="password"],
+input[type="url"],
+input[type="number"],
+textarea {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  outline: none;
+  background: var(--ui-panel);
+}
+
+select:focus,
+input:focus,
+textarea:focus,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+a {
+  color: var(--ui-accent);
+}
+
+.ui-field {
+  display: grid;
+  gap: 6px;
+}
+
+.ui-field > label,
+.ui-field > small {
+  color: var(--ui-muted);
+}
+
+.ui-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  gap: 16px;
+  cursor: pointer;
+}
+
+.ui-toggle-control {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+}
+
+.ui-toggle-control input {
+  position: absolute;
+  opacity: 0;
+}
+
+.ui-toggle-track {
+  display: block;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--ui-border);
+  transition: background 120ms ease;
+}
+
+.ui-toggle-track::after {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 2px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 30%);
+  transition: transform 120ms ease;
+  content: "";
+}
+
+.ui-toggle-control input:checked + .ui-toggle-track {
+  background: var(--ui-accent);
+}
+
+.ui-toggle-control input:checked + .ui-toggle-track::after {
+  transform: translateX(14px);
+}
+
+.ui-toggle-control input:focus-visible + .ui-toggle-track {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+.ui-toggle-control input:disabled + .ui-toggle-track {
+  opacity: 0.5;
+}
+
+.ui-button {
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  cursor: pointer;
+  background: var(--ui-panel);
+}
+
+.ui-button:hover:not(:disabled) {
+  background: var(--ui-panel-muted);
+}
+
+.ui-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.ui-button-primary {
+  border-color: var(--ui-accent);
+  color: #fff;
+  background: var(--ui-accent);
+}
+
+.ui-button-primary:hover:not(:disabled) {
+  border-color: var(--ui-accent-hover);
+  background: var(--ui-accent-hover);
+}
+
+.ui-button-danger {
+  color: var(--ui-danger);
+}
+
+.ui-button-quiet {
+  border-color: transparent;
+  background: transparent;
+}
+
+.ui-card {
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-panel);
+  box-shadow: var(--ui-shadow);
+}
+
+.ui-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.ui-card h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.ui-status {
+  margin: 0;
+  color: var(--ui-muted);
+}
+
+.ui-status-success {
+  color: var(--ui-success);
+}
+
+.ui-status-error {
+  color: var(--ui-danger);
+}
