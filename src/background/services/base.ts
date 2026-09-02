@@ -83,10 +83,16 @@ export interface TranslationService {
   readonly rateLimit: RateLimit;
   readonly placeholder: PlaceholderStyle;
   supportsLangs?(from: LangCode, to: LangCode): boolean;
+  supportsPair?(from: LangCode, to: LangCode): boolean;
   translate(
     request: TranslateRequest,
     signal: AbortSignal,
+    options?: TranslationStreamOptions,
   ): Promise<ServiceTranslateResult>;
+}
+
+export interface TranslationStreamOptions {
+  onPartial?(text: string): void | Promise<void>;
 }
 
 /** Constructor values shared by all service adapters. */
@@ -118,12 +124,17 @@ export abstract class BaseService implements TranslationService {
   }
 
   supportsLangs(from: LangCode, to: LangCode): boolean {
+    return this.supportsPair(from, to);
+  }
+
+  supportsPair(from: LangCode, to: LangCode): boolean {
     return from !== to;
   }
 
   abstract translate(
     request: TranslateRequest,
     signal: AbortSignal,
+    options?: TranslationStreamOptions,
   ): Promise<ServiceTranslateResult>;
 }
 
