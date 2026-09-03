@@ -4,6 +4,7 @@ import type {
   SubtitleCapture,
   SubtitleCapturePattern,
 } from "../../../shared/subtitle-types";
+import mainWorldScript from "./main-world?script&iife";
 
 const CONTENT_SOURCE = "imt-subtitle-content";
 const MAIN_SOURCE = "imt-subtitle-main";
@@ -30,10 +31,7 @@ export function installCaptureBridge(
   if (!patterns.length) return () => undefined;
   const script = document.createElement("script");
   script.dataset.imt = "subtitle-main";
-  script.type = "module";
-  script.src = browser.runtime.getURL(
-    "src/content/features/subtitle/main-world.ts",
-  );
+  script.src = browser.runtime.getURL(mainWorldScript);
 
   const configure = (): void => {
     window.postMessage(
