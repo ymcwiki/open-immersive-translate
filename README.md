@@ -1,8 +1,58 @@
-# 双语网页翻译
+# 开源版沉浸式翻译
+
+**沉浸式翻译（Immersive Translate）是闭源软件。** 它的 Chrome 扩展包是 12 MB 压缩混淆过的 JavaScript，没有源码、没有 source map，用户无法审计它发出了什么请求、无法修改它的行为，也无法在它停止维护时自救。
+
+这个仓库是一个从零编写、MIT 许可的开源替代品。功能对照它 1.32.7 版本逐项复刻（见 [docs/FEATURE_PARITY.md](docs/FEATURE_PARITY.md)，105 项中 102 项完成），全部代码可读、可改、可自行构建。
+
+- 和 immersivetranslate.com 没有任何关联，也不使用它的任何代码。
+- 没有账号系统、没有付费墙、没有埋点上报。翻译请求只发往你自己配置的服务。
+- **可以直接登录自己的 ChatGPT 账号翻译**（OAuth 设备码，不需要 API key），详见下文。
+- 支持 Chrome / Edge（MV3）、Firefox，以及油猴脚本版。
+
+> 这个项目由 AI 编码代理（OpenAI Codex）在人工编排下完成，开发过程的任务书保留在 [docs/prompts/](docs/prompts/)。
+
 
 这是一个 Chrome Manifest V3 双语翻译扩展。它按段落提取网页正文，在原文旁显示译文，并支持仅译文、正文/整页范围、遮罩学习模式、动态页面、富文本占位符和站点规则。
 
 首次安装默认使用免密钥的 Google 翻译服务，目标语言为简体中文。
+
+## 用自己的 ChatGPT 账号登录（OAuth，不需要 API key）
+
+这是本项目区别于原版最实用的一点：**你有 ChatGPT Plus / Pro / Team 订阅，就能直接用它翻译，不用再去 platform.openai.com 买 API 额度。** 原理和 OpenAI 官方 Codex CLI、[hermes-agent](https://github.com/nousresearch/hermes-agent) 一样，走 OpenAI 的设备码 OAuth 流程，拿到的令牌调用 ChatGPT 的 Codex 后端，用的是你订阅里包含的模型额度。
+
+### 登录步骤
+
+1. 设置页 →「翻译服务」→ 选「ChatGPT 账号（OAuth）」。
+2. 点「登录 ChatGPT」。设置页会显示一串**设备码**（形如 `XXXX-XXXXX`），旁边有复制按钮。
+3. 点「打开登录页面」，浏览器打开 `https://auth.openai.com/codex/device`，登录你的 ChatGPT 账号，把设备码填进去，点授权。
+4. 回到设置页，它会自动轮询，几秒内显示「已登录」以及账号邮箱、套餐类型、令牌有效期。
+5. 点「测试连接」确认能翻，然后在弹窗里把当前服务切成 ChatGPT 即可。
+
+整个过程不需要输入密码到插件里，授权全部在 OpenAI 自己的登录页完成。设备码 15 分钟内有效，过期重新点登录即可。
+
+### 已经装了 Codex CLI 的话
+
+展开「从 Codex CLI 导入」，把 `~/.codex/auth.json` 的完整内容粘贴进去，直接复用 CLI 已登录的凭据，不用再走一遍设备码。
+
+### 背后发生了什么
+
+| 步骤 | 请求 |
+|---|---|
+| 申请设备码 | `POST auth.openai.com/api/accounts/deviceauth/usercode` |
+| 轮询授权结果 | `POST auth.openai.com/api/accounts/deviceauth/token`（未完成返回 403/404） |
+| 换取令牌 | `POST auth.openai.com/oauth/token`（`authorization_code` + PKCE `code_verifier`） |
+| 翻译 | `POST chatgpt.com/backend-api/codex/responses`（Responses API，流式 SSE） |
+| 模型列表 | `GET chatgpt.com/backend-api/codex/models` |
+| 续期 | `POST auth.openai.com/oauth/token`（`refresh_token`，到期前 2 分钟自动刷新） |
+
+请求头带 `Authorization: Bearer <access_token>` 和从 JWT 里解出的 `ChatGPT-Account-ID`，并按 OpenAI 对第三方客户端的要求用 `originator` 标识本插件。401 会自动刷新令牌重试一次，429 按 `Retry-After` 退避。
+
+### 安全与边界
+
+- 访问令牌和刷新令牌只存在 `chrome.storage.local` 的独立条目里，**不会随配置导出**，也不会发给任何第三方。「退出登录」即清除。
+- 这是 OpenAI 面向 Codex 客户端开放的流程，额度受你订阅计划的限制，和网页版 ChatGPT 共用。用量大时可能触发 429，属正常限流。
+- 油猴脚本版不含此 provider（GM 请求层不支持流式 SSE），Chrome / Edge / Firefox 扩展版都支持。
+- 全部实现在 [src/background/services/chatgpt-oauth/](src/background/services/chatgpt-oauth/)，两个文件，可自行审阅。
 
 ## 主要入口
 
@@ -64,15 +114,6 @@ API Key 保存在浏览器的扩展本地存储中，不会写入项目文件。
 
 侧边栏对话、词典和 AI 写作需要选择 ChatGPT 账号、OpenAI 兼容、Azure OpenAI、Claude 或 Gemini 服务；这些请求只由后台适配器发出，页面脚本不会直接访问服务端接口。
 
-## 用 ChatGPT 账号登录（无需 API key）
-
-1. 打开设置页的“翻译服务”，选择“ChatGPT 账号（OAuth）”。
-2. 点击“登录 ChatGPT”，复制页面显示的设备码。
-3. 点击“打开登录页面”，在 `https://auth.openai.com/codex/device` 输入设备码并完成授权。
-4. 设置页显示账号和套餐后，点击“测试连接”。也可以展开“从 Codex CLI 导入”，粘贴 `~/.codex/auth.json` 的完整内容。
-
-此 provider 使用与 Codex CLI / hermes-agent 相同的设备码流程，通过 ChatGPT Codex 后端调用订阅账号可用的模型。访问令牌和刷新令牌只保存在 `chrome.storage.local` 的独立条目中，不进入配置导出。油猴脚本版不包含此 provider，因为它当前的 GM 请求层不支持所需的流式 SSE 响应。
-
 ## 编写站点规则
 
 在设置页的“站点规则”中填写 JSON 数组。下面的规则只扫描 `example.com` 的文章区域，跳过广告和补充的代码区域，并在访问时自动翻译：
@@ -126,3 +167,14 @@ pnpm e2e
 测试会构建扩展并以 `dist/` 启动 Chromium。端到端用例只使用确定性的 `mock` 服务，覆盖普通网页翻译与 DOM 恢复、术语表、遮罩、仅译文模式、PDF 阅读器、三条字幕的 SRT 文件页，以及侧边栏文字翻译。
 
 Netflix、Prime Video、Disney+、HBO Max、Hulu、课程平台和社交视频字幕适配器均有捕获格式 fixture 的解析单测。真实第三方站点的登录态、DRM、当前字幕接口和播放器版本仍需在线验证，因此这些兼容项继续标记为实验性。
+
+## 与原版的关系和致谢
+
+- 原版沉浸式翻译闭源；本项目只把它的公开功能列表当作对标目标，实现全部重写。
+- 内置站点规则里有 144 条由原版扩展包内公开的 `default_config.json` 站点规则（CSS 选择器等配置数据）经 [scripts/port-rules.ts](scripts/port-rules.ts) 转换而来，其余为手写。
+- ChatGPT 账号 OAuth 设备码登录流程参考了 [hermes-agent](https://github.com/nousresearch/hermes-agent)（MIT）的实现。
+- PDF 渲染使用 pdf.js，双语 PDF 导出使用 pdf-lib。
+
+## 许可证
+
+MIT，见 [LICENSE](LICENSE)。

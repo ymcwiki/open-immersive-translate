@@ -31,7 +31,7 @@ interface ReferenceRule extends Record<string, unknown> {
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDirectory, "..");
 const defaultReferencePath =
-  "/Users/weyk/Library/Application Support/Google/Chrome/Profile 1/Extensions/bpoadfkcbjbfhfodiogcnhhhpibjhbnh/1.32.7_0/default_config.json";
+  "~/Library/Application Support/Google/Chrome/<Profile>/Extensions/bpoadfkcbjbfhfodiogcnhhhpibjhbnh/1.32.7_0/default_config.json";
 const defaultOutputDirectory = join(
   projectRoot,
   "src/background/rules/builtin-rules",
