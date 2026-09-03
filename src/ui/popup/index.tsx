@@ -254,7 +254,7 @@ export function Popup(): preact.JSX.Element {
                 label={t("popup.feedback")}
                 onClick={() =>
                   void browser.tabs.create({
-                    url: "https://github.com/example/bilingual-translator/issues",
+                    url: "https://github.com/ymcwiki/open-immersive-translate/issues",
                   })
                 }
               />

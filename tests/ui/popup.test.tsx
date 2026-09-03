@@ -148,7 +148,7 @@ describe("Popup", () => {
     });
     fireEvent.click(screen.getByRole("menuitem", { name: "反馈" }));
     expect(browserMock.tabs.create).toHaveBeenCalledWith({
-      url: "https://github.com/example/bilingual-translator/issues",
+      url: "https://github.com/ymcwiki/open-immersive-translate/issues",
     });
     fireEvent.click(screen.getByRole("menuitem", { name: "翻译本地 PDF" }));
     expect(browserMock.tabs.create).toHaveBeenCalledWith({
