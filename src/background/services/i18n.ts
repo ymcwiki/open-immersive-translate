@@ -26,6 +26,8 @@ const zhCN = {
   headers: "请求头 JSON",
   requestBodyTemplate: "请求体模板",
   responseJsonPath: "响应 JSON 路径",
+  reasoningEffort: "翻译思考强度",
+  reasoningEffortAssistant: "助手思考强度",
 } as const;
 
 export type ServiceI18nKey = keyof typeof zhCN;
@@ -56,6 +58,8 @@ const en: Record<ServiceI18nKey, string> = {
   headers: "Headers JSON",
   requestBodyTemplate: "Request body template",
   responseJsonPath: "Response JSON path",
+  reasoningEffort: "Translation reasoning effort",
+  reasoningEffortAssistant: "Assistant reasoning effort",
 };
 
 export function serviceText(

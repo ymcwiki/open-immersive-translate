@@ -91,6 +91,8 @@ export function createService(
         maxBatchChars: config.maxBatchChars,
         rateLimit: config.rateLimit,
         ignoreResRegexs: config.ignoreResRegexs,
+        reasoningEffort: config.reasoningEffort,
+        reasoningEffortAssistant: config.reasoningEffortAssistant,
       });
     case "claude":
       return new ClaudeService({

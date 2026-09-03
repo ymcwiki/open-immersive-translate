@@ -63,12 +63,16 @@
 
 请求头带 `Authorization: Bearer <access_token>` 和从 JWT 里解出的 `ChatGPT-Account-ID`，并按 OpenAI 对第三方客户端的要求用 `originator` 标识本插件。401 会自动刷新令牌重试一次，429 按 `Retry-After` 退避。
 
+### 思考强度
+
+ChatGPT 服务可分别设置翻译和助手的思考强度，默认是「低」和「中」。批量翻译格式固定、重复度高，使用「低」通常能兼顾质量与速度；追求速度可选「无」。`max` 只适用于 `gpt-5.6*` 模型，其他模型会自动降到「极高」。助手设置同时用于侧边栏对话、词典和 AI 写作。
+
 ### 安全与边界
 
 - 访问令牌和刷新令牌只存在 `chrome.storage.local` 的独立条目里，**不会随配置导出**，也不会发给任何第三方。「退出登录」即清除。
 - 这是 OpenAI 面向 Codex 客户端开放的流程，额度受你订阅计划的限制，和网页版 ChatGPT 共用。用量大时可能触发 429，属正常限流。
 - 油猴脚本版不含此 provider（GM 请求层不支持流式 SSE），Chrome / Edge / Firefox 扩展版都支持。
-- 全部实现在 [src/background/services/chatgpt-oauth/](src/background/services/chatgpt-oauth/)，两个文件，可自行审阅。
+- 全部实现在 [src/background/services/chatgpt-oauth/](src/background/services/chatgpt-oauth/)，可自行审阅。
 
 ## 主要入口
 

@@ -290,6 +290,62 @@ describe("Options", () => {
     expect(screen.getByText("从 Codex CLI 导入")).toBeTruthy();
   });
 
+  it("writes ChatGPT reasoning settings and hides unsupported max options", async () => {
+    stored.services.chatgpt = {
+      ...stored.services.chatgpt!,
+      model: "gpt-5.5",
+      reasoningEffort: "max",
+      reasoningEffortAssistant: "medium",
+    };
+    browserMock.runtime.sendMessage.mockImplementation(
+      async (message: { type?: string }) =>
+        message.type === "chatgptOauth.status"
+          ? { state: "logged_out" }
+          : undefined,
+    );
+    render(<Options />);
+    await screen.findByRole("heading", { name: "基本", level: 2 });
+    fireEvent.click(screen.getByRole("tab", { name: "翻译服务" }));
+    fireEvent.change(screen.getByLabelText("选择服务"), {
+      target: { value: "chatgpt" },
+    });
+
+    const translationEffort = await screen.findByLabelText("翻译思考强度");
+    const assistantEffort = screen.getByLabelText("助手思考强度");
+    expect((translationEffort as HTMLSelectElement).value).toBe("xhigh");
+    expect(
+      within(translationEffort).queryByRole("option", { name: "最大" }),
+    ).toBeNull();
+    expect(
+      within(assistantEffort).queryByRole("option", { name: "最大" }),
+    ).toBeNull();
+    expect(screen.getByText(/实际使用“极高”/)).toBeTruthy();
+
+    fireEvent.change(translationEffort, { target: { value: "high" } });
+    fireEvent.change(assistantEffort, { target: { value: "none" } });
+    await waitFor(() => {
+      expect(stored.services.chatgpt?.reasoningEffort).toBe("high");
+      expect(stored.services.chatgpt?.reasoningEffortAssistant).toBe("none");
+    });
+
+    fireEvent.input(screen.getByLabelText("模型"), {
+      target: { value: "gpt-5.6-sol" },
+    });
+    await waitFor(() =>
+      expect(
+        within(screen.getByLabelText("翻译思考强度")).getByRole("option", {
+          name: "最大",
+        }),
+      ).toBeTruthy(),
+    );
+    fireEvent.change(screen.getByLabelText("翻译思考强度"), {
+      target: { value: "max" },
+    });
+    await waitFor(() =>
+      expect(stored.services.chatgpt?.reasoningEffort).toBe("max"),
+    );
+  });
+
   it("shows a pending ChatGPT device code and login link", async () => {
     browserMock.runtime.sendMessage.mockImplementation(
       async (message: { type?: string }) =>

@@ -19,10 +19,15 @@ import { EXTENSION_COMMAND_IDS } from "../../background/commands";
 import type {
   JsonValue,
   LangCode,
+  ReasoningEffort,
   Rule,
   ServiceConfig,
   TranslationMode,
 } from "../../shared/types";
+import {
+  clampEffort,
+  supportedEfforts,
+} from "../../background/services/chatgpt-oauth/reasoning";
 import type { KConfig } from "../../shared/k-types";
 import { Button, Card, Field, Select, Toggle } from "../shared/components";
 import { parseConfigImport, serializeConfig } from "../shared/config-transfer";
@@ -513,6 +518,23 @@ function ServiceField({
   const id = `${serviceId}-${descriptor.name}`;
   const value = serviceFieldValue(service, descriptor.name);
   const label = descriptor.label;
+  const reasoningField =
+    descriptor.name === "reasoningEffort" ||
+    descriptor.name === "reasoningEffortAssistant";
+  const effectiveValue = reasoningField
+    ? clampEffort(value as ReasoningEffort, service.model)
+    : value;
+  const wasClamped = reasoningField && effectiveValue !== value;
+  const hint = [
+    descriptor.hint,
+    wasClamped
+      ? currentUiLocale() === "en"
+        ? `${descriptor.optionLabels?.[value] ?? value} is unavailable for this model; ${descriptor.optionLabels?.[effectiveValue] ?? effectiveValue} will be used.`
+        : `当前模型不支持“${descriptor.optionLabels?.[value] ?? value}”，实际使用“${descriptor.optionLabels?.[effectiveValue] ?? effectiveValue}”。`
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join(" ");
   if (descriptor.type === "checkbox") {
     return (
       <Toggle
@@ -523,14 +545,19 @@ function ServiceField({
     );
   }
   if (descriptor.type === "select") {
+    const options = (descriptor.options ?? []).filter(
+      (option) =>
+        !reasoningField ||
+        supportedEfforts(service.model).includes(option as ReasoningEffort),
+    );
     return (
-      <Field label={label} htmlFor={id}>
+      <Field label={label} htmlFor={id} hint={hint}>
         <Select
           id={id}
-          value={value}
-          options={(descriptor.options ?? []).map((option) => ({
+          value={effectiveValue}
+          options={options.map((option) => ({
             value: option,
-            label: option,
+            label: descriptor.optionLabels?.[option] ?? option,
           }))}
           onChange={onChange}
         />
@@ -604,6 +631,10 @@ function serviceFieldValue(
   key: ServiceFieldDescriptor["name"],
 ): string {
   if (key === "auth") return "";
+  if (key === "reasoningEffort") return service.reasoningEffort ?? "low";
+  if (key === "reasoningEffortAssistant") {
+    return service.reasoningEffortAssistant ?? "medium";
+  }
   const value = service[key];
   if (key === "models") return service.models?.join("\n") ?? "";
   if (key === "headers") return value ? JSON.stringify(value, null, 2) : "";

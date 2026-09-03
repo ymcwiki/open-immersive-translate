@@ -1,7 +1,11 @@
 import browser from "webextension-polyfill";
 
 import type { AssistantRequest } from "../../../shared/k-assistant";
-import type { RateLimit, TranslateRequest } from "../../../shared/types";
+import type {
+  RateLimit,
+  ReasoningEffort,
+  TranslateRequest,
+} from "../../../shared/types";
 import { assistantConversation, assistantInstruction } from "../assistant";
 import {
   BaseService,
@@ -29,6 +33,7 @@ import {
   refreshChatgptOauthTokens,
   type ChatgptOauthTokens,
 } from "./auth";
+import { clampEffort } from "./reasoning";
 
 export const CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex";
 export const CODEX_RESPONSES_URL = `${CODEX_BASE_URL}/responses`;
@@ -58,6 +63,8 @@ export interface ChatgptServiceOptions {
   maxBatchSize?: number;
   maxBatchChars?: number;
   rateLimit?: Partial<RateLimit>;
+  reasoningEffort?: ReasoningEffort;
+  reasoningEffortAssistant?: ReasoningEffort;
 }
 
 interface ModelCache {
@@ -257,6 +264,8 @@ export class ChatgptOauthService extends BaseService {
   private readonly model?: string;
   private readonly promptSystem?: string;
   private readonly promptUser?: string;
+  private readonly reasoningEffort: ReasoningEffort;
+  private readonly reasoningEffortAssistant: ReasoningEffort;
   private readonly timeoutMs: number;
   private readonly refusalPatterns: RegExp[];
   readonly onPartial: (
@@ -280,6 +289,9 @@ export class ChatgptOauthService extends BaseService {
     this.model = options.model;
     this.promptSystem = options.promptSystem ?? options.prompt;
     this.promptUser = options.promptUser;
+    this.reasoningEffort = options.reasoningEffort ?? "low";
+    this.reasoningEffortAssistant =
+      options.reasoningEffortAssistant ?? "medium";
     this.timeoutMs = options.timeoutMs ?? 60_000;
     this.refusalPatterns = buildRefusalPatterns(options.ignoreResRegexs);
     this.onPartial = (request, emitCumulativeText, signal) =>
@@ -342,6 +354,7 @@ export class ChatgptOauthService extends BaseService {
     signal: AbortSignal,
     options?: TranslationStreamOptions,
   ): Promise<string> {
+    const model = await this.selectedModel();
     const input = assistantConversation(request).map((message) => ({
       role: message.role,
       content: [
@@ -353,7 +366,10 @@ export class ChatgptOauthService extends BaseService {
     }));
     return this.streamResponse(
       {
-        model: await this.selectedModel(),
+        model,
+        reasoning: {
+          effort: clampEffort(this.reasoningEffortAssistant, model),
+        },
         instructions: assistantInstruction(request),
         input,
         store: false,
@@ -377,11 +393,13 @@ export class ChatgptOauthService extends BaseService {
     options?: TranslationStreamOptions,
   ): Promise<ServiceTranslateResult> {
     if (!request.texts.length) return { texts: [] };
+    const model = await this.selectedModel();
     const batch = buildYamlBatch(request.texts);
     const templates = DEFAULT_PROMPTS[requestPromptVariant(request)];
     const content = await this.streamResponse(
       {
-        model: await this.selectedModel(),
+        model,
+        reasoning: { effort: clampEffort(this.reasoningEffort, model) },
         instructions: renderPromptTemplate(
           this.promptSystem ?? templates.system,
           request,

@@ -10,7 +10,7 @@ import { DEFAULT_SUBTITLE_CONFIG, type SubtitleConfig } from "./subtitle-types";
 import type { Config, ConfigPatch, Rule, ServiceConfig } from "./types";
 
 /** Current persisted configuration format. */
-export const CONFIG_VERSION = 2;
+export const CONFIG_VERSION = 3;
 
 /** Storage key containing the complete configuration object. */
 export const CONFIG_STORAGE_KEY = "config";
@@ -26,6 +26,14 @@ const rateLimitSchema = z.object({
   rps: z.number().positive().optional(),
   concurrency: z.number().int().positive().optional(),
 });
+export const reasoningEffortSchema = z.enum([
+  "none",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+]);
 const translationModePatternSchema = z.object({
   dualMatches: z.array(z.string()).default([]),
   translationMatches: z.array(z.string()).default([]),
@@ -42,7 +50,7 @@ const remoteRuleSubscriptionSchema = z.object({
 });
 
 /** Runtime schema for persisted service settings. */
-export const serviceConfigSchema: z.ZodType<ServiceConfig> = z.object({
+const serviceConfigBaseSchema: z.ZodType<ServiceConfig> = z.object({
   kind: z.enum([
     "openai-compatible",
     "chatgpt",
@@ -100,7 +108,21 @@ export const serviceConfigSchema: z.ZodType<ServiceConfig> = z.object({
   promptUser: z.string().optional(),
   models: z.array(z.string()).optional(),
   stream: z.boolean().optional(),
+  reasoningEffort: reasoningEffortSchema.optional(),
+  reasoningEffortAssistant: reasoningEffortSchema.optional(),
 });
+
+export const serviceConfigSchema: z.ZodType<ServiceConfig> = z.preprocess(
+  (value) =>
+    isRecord(value) && value.kind === "chatgpt"
+      ? {
+          ...value,
+          reasoningEffort: value.reasoningEffort ?? "low",
+          reasoningEffortAssistant: value.reasoningEffortAssistant ?? "medium",
+        }
+      : value,
+  serviceConfigBaseSchema,
+);
 
 /** Runtime schema for built-in and user site rules. */
 export const ruleSchema: z.ZodType<Rule> = z.object({
@@ -152,7 +174,12 @@ export const ruleSchema: z.ZodType<Rule> = z.object({
 
 export const DEFAULT_SERVICES: Record<string, ServiceConfig> = {
   "openai-compatible": { kind: "openai-compatible", enabled: false },
-  chatgpt: { kind: "chatgpt", enabled: false },
+  chatgpt: {
+    kind: "chatgpt",
+    enabled: false,
+    reasoningEffort: "low",
+    reasoningEffortAssistant: "medium",
+  },
   claude: { kind: "claude", enabled: false },
   gemini: { kind: "gemini", enabled: false },
   google: { kind: "google", enabled: true },
@@ -517,6 +544,28 @@ registerConfigMigration(1, (config) => {
         : typeof config.globalCss === "string"
           ? config.globalCss
           : "",
+  };
+});
+
+registerConfigMigration(2, (config) => {
+  const services = isRecord(config.services) ? config.services : {};
+  const chatgpt = isRecord(services.chatgpt) ? services.chatgpt : {};
+  return {
+    ...config,
+    version: 3,
+    services: {
+      ...services,
+      chatgpt: {
+        kind: "chatgpt",
+        enabled: false,
+        ...chatgpt,
+        reasoningEffort:
+          chatgpt.reasoningEffort ?? DEFAULT_SERVICES.chatgpt!.reasoningEffort,
+        reasoningEffortAssistant:
+          chatgpt.reasoningEffortAssistant ??
+          DEFAULT_SERVICES.chatgpt!.reasoningEffortAssistant,
+      },
+    },
   };
 });
 

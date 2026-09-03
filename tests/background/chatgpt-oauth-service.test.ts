@@ -201,6 +201,7 @@ describe("ChatgptOauthService", () => {
     const body = JSON.parse(String(init.body)) as Record<string, unknown>;
     expect(body).toMatchObject({
       model: "gpt-5.4-mini",
+      reasoning: { effort: "low" },
       store: false,
       stream: true,
     });
@@ -216,6 +217,52 @@ describe("ChatgptOauthService", () => {
         ],
       },
     ]);
+  });
+
+  it("uses separate configured efforts for translation and assistant requests", async () => {
+    const accessToken = jwt({
+      exp: Math.floor(Date.now() / 1_000) + 3_600,
+    });
+    state.stored[CHATGPT_AUTH_STORAGE_KEY] = {
+      tokens: storedTokens(accessToken),
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        sseResponse([
+          'data: {"type":"response.output_text.delta","delta":"- id: 1\\n  text: 你好"}\n\n',
+        ]),
+      )
+      .mockResolvedValueOnce(
+        sseResponse([
+          'data: {"type":"response.output_text.delta","delta":"助手回复"}\n\n',
+        ]),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const service = new ChatgptOauthService({
+      model: "gpt-5.5",
+      reasoningEffort: "max",
+      reasoningEffortAssistant: "high",
+    });
+    const signal = new AbortController().signal;
+
+    await service.translate(
+      { texts: ["Hello"], from: "en", to: "zh-CN" },
+      signal,
+    );
+    await service.completePrompt(
+      { kind: "chat", text: "Hello", service: "chatgpt" },
+      signal,
+    );
+
+    const translationBody = JSON.parse(
+      String(fetchMock.mock.calls[0]?.[1]?.body),
+    ) as Record<string, unknown>;
+    const assistantBody = JSON.parse(
+      String(fetchMock.mock.calls[1]?.[1]?.body),
+    ) as Record<string, unknown>;
+    expect(translationBody.reasoning).toEqual({ effort: "xhigh" });
+    expect(assistantBody.reasoning).toEqual({ effort: "high" });
   });
 
   it("refreshes once after a 401 and retries with the new token", async () => {

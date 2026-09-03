@@ -6,9 +6,23 @@ import {
   CONFIG_VERSION,
   DEFAULT_CONFIG,
   migrateConfig,
+  serviceConfigSchema,
 } from "../../src/shared/config";
 
 describe("configuration migration", () => {
+  it("applies and validates ChatGPT reasoning defaults", () => {
+    expect(serviceConfigSchema.parse({ kind: "chatgpt" })).toMatchObject({
+      reasoningEffort: "low",
+      reasoningEffortAssistant: "medium",
+    });
+    expect(() =>
+      serviceConfigSchema.parse({
+        kind: "chatgpt",
+        reasoningEffort: "minimal",
+      }),
+    ).toThrow();
+  });
+
   it("upgrades legacy phase-one UI fields without losing service settings", () => {
     const migrated = migrateConfig({
       ...DEFAULT_CONFIG,
@@ -51,6 +65,8 @@ describe("configuration migration", () => {
     expect(migrated.services.chatgpt).toEqual({
       kind: "chatgpt",
       enabled: false,
+      reasoningEffort: "low",
+      reasoningEffortAssistant: "medium",
     });
     expect(migrated.shortcuts.toggleTranslatePage).toBe("Alt+Q");
     expect(migrated.subtitle).toMatchObject({
@@ -67,5 +83,23 @@ describe("configuration migration", () => {
       mode: "translation",
     });
     expect(migrated.globalCustomCss).toContain("color: red");
+  });
+
+  it("fills ChatGPT reasoning defaults when migrating an existing config", () => {
+    const migrated = migrateConfig({
+      ...DEFAULT_CONFIG,
+      version: 2,
+      services: {
+        ...DEFAULT_CONFIG.services,
+        chatgpt: { kind: "chatgpt", enabled: true, model: "gpt-5.5" },
+      },
+    });
+
+    expect(migrated.services.chatgpt).toMatchObject({
+      enabled: true,
+      model: "gpt-5.5",
+      reasoningEffort: "low",
+      reasoningEffortAssistant: "medium",
+    });
   });
 });

@@ -1,5 +1,7 @@
 import { serviceText, type ServiceI18nKey, type ServiceUiLocale } from "./i18n";
 import { getPreset } from "./presets";
+import { EFFORT_LADDER } from "./chatgpt-oauth/reasoning";
+import type { ReasoningEffort } from "../../shared/types";
 
 export type ServiceFieldName = ServiceI18nKey | "auth";
 export type ServiceFieldType =
@@ -11,8 +13,29 @@ export interface ServiceFieldDescriptor {
   type: ServiceFieldType;
   required?: boolean;
   options?: readonly string[];
+  optionLabels?: Readonly<Record<string, string>>;
+  hint?: string;
   allowCustom?: boolean;
 }
+
+const effortLabels: Record<ServiceUiLocale, Record<ReasoningEffort, string>> = {
+  "zh-CN": {
+    none: "无",
+    low: "低",
+    medium: "中",
+    high: "高",
+    xhigh: "极高",
+    max: "最大",
+  },
+  en: {
+    none: "None",
+    low: "Low",
+    medium: "Medium",
+    high: "High",
+    xhigh: "Extra high",
+    max: "Maximum",
+  },
+};
 
 const credentials: Record<string, readonly ServiceI18nKey[]> = {
   gemini: ["apiKey"],
@@ -71,7 +94,12 @@ function fieldType(name: ServiceFieldName): ServiceFieldType {
   if (name === "auth") return "auth";
   if (name === "apiKey" || name === "secret") return "password";
   if (name === "stream") return "checkbox";
-  if (name === "formality") return "select";
+  if (
+    name === "formality" ||
+    name === "reasoningEffort" ||
+    name === "reasoningEffortAssistant"
+  )
+    return "select";
   if (name === "model") return "model";
   if (
     name === "models" ||
@@ -130,6 +158,8 @@ export function serviceFields(
     return [
       "auth",
       "model",
+      "reasoningEffort",
+      "reasoningEffortAssistant",
       "promptSystem",
       "promptUser",
       "timeoutMs",
@@ -145,6 +175,20 @@ export function serviceFields(
       type: fieldType(name as ServiceFieldName),
       ...(name === "model"
         ? { options: getModels(serviceId), allowCustom: true }
+        : {}),
+      ...(name === "reasoningEffort" || name === "reasoningEffortAssistant"
+        ? {
+            options: EFFORT_LADDER,
+            optionLabels: effortLabels[locale],
+            ...(name === "reasoningEffort"
+              ? {
+                  hint:
+                    locale === "en"
+                      ? "Low is recommended for translation; choose None for speed."
+                      : "翻译建议选“低”，追求速度可选“无”。",
+                }
+              : {}),
+          }
         : {}),
     }));
   }

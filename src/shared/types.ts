@@ -137,6 +137,10 @@ export interface RateLimit {
   concurrency: number;
 }
 
+/** Reasoning levels accepted by the ChatGPT Codex Responses backend. */
+export type ReasoningEffort =
+  "none" | "low" | "medium" | "high" | "xhigh" | "max";
+
 /** Contract implemented by every translation service adapter. */
 export interface TranslationService {
   readonly id: string;
@@ -222,6 +226,8 @@ export interface ServiceConfig {
   promptUser?: string;
   models?: string[];
   stream?: boolean;
+  reasoningEffort?: ReasoningEffort;
+  reasoningEffortAssistant?: ReasoningEffort;
 }
 
 /** How source and translated text are displayed. */

@@ -74,6 +74,9 @@ describe("translation service metadata", () => {
         ?.label,
     ).toBe("Formality");
     expect(serviceFields("chatgpt").map(({ name }) => name)).toContain("auth");
+    expect(serviceFields("chatgpt").map(({ name }) => name)).toEqual(
+      expect.arrayContaining(["reasoningEffort", "reasoningEffortAssistant"]),
+    );
     expect(serviceFields("chatgpt").map(({ name }) => name)).not.toContain(
       "apiKey",
     );
