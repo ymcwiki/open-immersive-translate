@@ -16,6 +16,22 @@
 
 首次安装默认使用免密钥的 Google 翻译服务，目标语言为简体中文。
 
+## 原版是怎么闭源的
+
+沉浸式翻译最初是开源的，后来把源码收了回去，这是可以在 GitHub 上核对的公开事实：
+
+| 时间 | 事件 |
+|---|---|
+| 2022-11-04 | 作者创建开源仓库 [old-immersive-translate](https://github.com/immersive-translate/old-immersive-translate)，许可证 MPL-2.0，发布到 v0.0.41 |
+| 2022-12-07 | 新建现在的 [immersive-translate/immersive-translate](https://github.com/immersive-translate/immersive-translate) 仓库 |
+| 2023-01-16 | 旧开源仓库最后一次推送 |
+| 2023-01-17 | 旧开源仓库被归档（按官方 README 的说法） |
+| 此后至今 | 新仓库只放 `dist/`（打包产物）、`docs/` 和 README，没有 `src/`，没有许可证文件；README 明确写着「沉浸式翻译并非开源软件，这个仓库并不包含沉浸式翻译的源代码」 |
+
+也就是说，开源状态只维持了大约两个半月、到 v0.0.41 为止。现在 GitHub 上那 1.8 万个 star 挂在一个只有发布产物的仓库上。装到浏览器里的扩展包（以 1.32.7 为例）是 12 MB 压缩混淆过的 JavaScript，没有 source map，`content_main.js` 单文件 3.5 MB。它后来加入了账号体系、Pro 订阅、活动运营和埋点上报，这些逻辑同样无法审计。
+
+本项目不评价这个商业选择，只是给需要可审计、可修改版本的人一个选项。
+
 ## 用自己的 ChatGPT 账号登录（OAuth，不需要 API key）
 
 这是本项目区别于原版最实用的一点：**你有 ChatGPT Plus / Pro / Team 订阅，就能直接用它翻译，不用再去 platform.openai.com 买 API 额度。** 原理和 OpenAI 官方 Codex CLI、[hermes-agent](https://github.com/nousresearch/hermes-agent) 一样，走 OpenAI 的设备码 OAuth 流程，拿到的令牌调用 ChatGPT 的 Codex 后端，用的是你订阅里包含的模型额度。
