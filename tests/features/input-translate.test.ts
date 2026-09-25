@@ -92,6 +92,31 @@ describe("input translation", () => {
     dispose();
   });
 
+  it("keeps the language picker hidden for an ordinary space and closes it on scroll", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const input = document.createElement("textarea");
+    input.value = "hello";
+    document.body.append(input);
+    const dispose = init(context());
+
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: " " }),
+    );
+    expect(document.querySelector('[data-imt="input-target"]')).toBeNull();
+
+    input.value = "hello ";
+    vi.advanceTimersByTime(200);
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: " " }),
+    );
+    expect(document.querySelector('[data-imt="input-target"]')).not.toBeNull();
+
+    window.dispatchEvent(new Event("scroll"));
+    expect(document.querySelector('[data-imt="input-target"]')).toBeNull();
+    dispose();
+  });
+
   it("asks before translating more than 200 characters", () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const translateText = vi.fn().mockResolvedValue("unused");

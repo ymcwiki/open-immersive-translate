@@ -214,10 +214,12 @@ export function init(ctx: FeatureContext): () => void {
   let pending: PendingTranslation | null = null;
   let disposed = false;
   let targetBar: HTMLElement | null = null;
+  let targetBarField: EditableField | null = null;
 
   const hideTargetBar = (): void => {
     targetBar?.remove();
     targetBar = null;
+    targetBarField = null;
   };
 
   const showTargetBar = (field: EditableField): void => {
@@ -258,6 +260,12 @@ export function init(ctx: FeatureContext): () => void {
     shadow.append(style, select);
     document.documentElement.append(host);
     targetBar = host;
+    targetBarField = field;
+    host.addEventListener("pointerleave", () => {
+      if (document.activeElement !== field && document.activeElement !== host) {
+        hideTargetBar();
+      }
+    });
   };
 
   const cancelPending = (): void => {
@@ -353,7 +361,6 @@ export function init(ctx: FeatureContext): () => void {
     }
 
     if (config.input.triggerMode === "prefix") return;
-    showTargetBar(field);
 
     const now = Date.now();
     const times = (keyTimes.get(field) ?? []).filter(
@@ -361,6 +368,14 @@ export function init(ctx: FeatureContext): () => void {
     );
     times.push(now);
     keyTimes.set(field, times);
+
+    if (
+      times.length >= 2 &&
+      times.length < config.input.trailingTriggerCount &&
+      value.endsWith(trailingKey.repeat(times.length - 1))
+    ) {
+      showTargetBar(field);
+    }
 
     if (
       value.endsWith(
@@ -394,15 +409,22 @@ export function init(ctx: FeatureContext): () => void {
 
   const onFocusOut = (event: FocusEvent): void => {
     const field = findEditable(event.target);
-    if (!field) return;
+    if (!field || field !== targetBarField) return;
     setTimeout(() => {
-      if (!targetBar?.matches(":hover")) hideTargetBar();
+      if (
+        document.activeElement !== targetBar &&
+        !targetBar?.matches(":hover")
+      ) hideTargetBar();
     }, 0);
   };
+
+  const onViewportChange = (): void => hideTargetBar();
 
   document.addEventListener("keydown", onKeyDown, true);
   document.addEventListener("input", onInput, true);
   document.addEventListener("focusout", onFocusOut, true);
+  window.addEventListener("scroll", onViewportChange, true);
+  window.addEventListener("resize", onViewportChange);
 
   return () => {
     disposed = true;
@@ -410,6 +432,8 @@ export function init(ctx: FeatureContext): () => void {
     document.removeEventListener("keydown", onKeyDown, true);
     document.removeEventListener("input", onInput, true);
     document.removeEventListener("focusout", onFocusOut, true);
+    window.removeEventListener("scroll", onViewportChange, true);
+    window.removeEventListener("resize", onViewportChange);
   };
 }
 
