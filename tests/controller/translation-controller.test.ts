@@ -44,6 +44,7 @@ import { DEFAULT_CONFIG } from "../../src/shared/config";
 import { TranslationController } from "../../src/content/controller/translation-controller";
 import { TRANSLATION_OVERRIDES_KEY } from "../../src/content/controller/editable";
 import { extractParagraphs } from "../../src/content/extract/scanner";
+import { removeAll as removeRenderedTranslations } from "../../src/content/render/inject";
 import type { AdvancedPageConfig } from "../../src/shared/j-types";
 import type { Config } from "../../src/shared/types";
 
@@ -56,6 +57,7 @@ function config(): Config {
 }
 
 afterEach(() => {
+  removeRenderedTranslations(document);
   vi.useRealTimers();
   portPosts.length = 0;
   portListeners.length = 0;
@@ -68,6 +70,47 @@ afterEach(() => {
 });
 
 describe("TranslationController", () => {
+  it("translates both runs of the NovelAI character-position paragraph", async () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = `<article><p>Additionally, you can indicate <strong>where</strong> in the image you want your characters to appear. To make use of this feature, you need to have at least one character prompt set up. Change the position from <strong>AI’s Choice</strong> to <strong>Custom</strong> in the character prompts section. Then, you can click on the <img src="/characterpositions.svg"> <strong>Character Positions</strong> button, which will open up a canvas where you can freely position your character prompts, and the model will closely follow the positions you set.<br><em>Note: The <strong>V4</strong> and <strong>V4.5</strong> models are limited to a 5x5 grid for custom character positioning.</em></p></article>`;
+    const rule = { ...generalRule, isTranslateTitle: false };
+    const controller = new TranslationController(config(), rule);
+    controller.start("whole");
+    await vi.advanceTimersByTimeAsync(150);
+
+    const requests = portPosts.filter(
+      (
+        item,
+      ): item is {
+        type: "translate";
+        requestId: string;
+        paragraphs: Array<{ id: string; text: string }>;
+      } => (item as { type?: string }).type === "translate",
+    );
+    const sent = requests.flatMap((request) => request.paragraphs);
+    expect(sent).toHaveLength(2);
+    expect(sent[0]?.text).toContain("Additionally, you can indicate");
+    expect(sent[1]?.text).toContain("Note: The");
+
+    for (const request of requests) {
+      portListeners[0]?.({
+        type: "translateResult",
+        requestId: request.requestId,
+        results: request.paragraphs.map(({ id, text }) => ({
+          id,
+          text: text.includes("Additionally") ? "正文译文" : "注释译文",
+        })),
+        done: true,
+      });
+    }
+    expect(
+      [...document.querySelectorAll('p [data-imt="target"]')].map(
+        (node) => node.textContent,
+      ),
+    ).toEqual(["正文译文", "注释译文"]);
+    controller.destroy();
+  });
+
   it("translates only main prose and sends domain glossary plus page context", async () => {
     vi.useFakeTimers();
     document.title = "Test article";
