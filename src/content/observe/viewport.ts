@@ -48,7 +48,7 @@ export function observeViewport(
   onVisible: (ids: string[]) => void,
   options: ViewportObserverOptions = {},
 ): ViewportObserver {
-  const idsByElement = new Map<Element, string>();
+  const idsByElement = new Map<Element, Set<string>>();
   const visibleIds = new Set<string>();
   let idleHandle: number | undefined;
   let timerHandle: ReturnType<typeof setTimeout> | undefined;
@@ -85,11 +85,11 @@ export function observeViewport(
             if (!entry.isIntersecting) {
               continue;
             }
-            const id = idsByElement.get(entry.target);
-            if (!id) {
+            const ids = idsByElement.get(entry.target);
+            if (!ids?.size) {
               continue;
             }
-            visibleIds.add(id);
+            for (const id of ids) visibleIds.add(id);
             hasVisibleEntry = true;
             observer?.unobserve(entry.target);
           }
@@ -106,7 +106,9 @@ export function observeViewport(
       return;
     }
     const normalized = normalizeContainer(input, id);
-    idsByElement.set(normalized.container, normalized.id);
+    const ids = idsByElement.get(normalized.container) ?? new Set<string>();
+    ids.add(normalized.id);
+    idsByElement.set(normalized.container, ids);
     if (observer) {
       observer.observe(normalized.container);
     } else {
@@ -116,13 +118,24 @@ export function observeViewport(
   };
 
   const remove = (containerOrId: Element | string): void => {
-    for (const [container, id] of idsByElement) {
-      if (containerOrId !== container && containerOrId !== id) {
+    for (const [container, ids] of idsByElement) {
+      if (
+        containerOrId !== container &&
+        (typeof containerOrId !== "string" || !ids.has(containerOrId))
+      ) {
         continue;
       }
-      observer?.unobserve(container);
-      idsByElement.delete(container);
-      visibleIds.delete(id);
+      if (containerOrId === container) {
+        for (const id of ids) visibleIds.delete(id);
+        ids.clear();
+      } else if (typeof containerOrId === "string") {
+        ids.delete(containerOrId);
+        visibleIds.delete(containerOrId);
+      }
+      if (ids.size === 0) {
+        observer?.unobserve(container);
+        idsByElement.delete(container);
+      }
     }
   };
 

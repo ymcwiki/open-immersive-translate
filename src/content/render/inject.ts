@@ -138,7 +138,7 @@ const BLOCK_DISPLAYS = new Set([
 ]);
 
 const states = new Set<RenderState>();
-const statesByContainer = new WeakMap<Element, RenderState>();
+const statesByContainer = new WeakMap<Element, Map<string, RenderState>>();
 const styleStates = new WeakMap<
   Document | ShadowRoot,
   AdoptedStyleState | ElementStyleState
@@ -160,17 +160,22 @@ function appendTarget(
   prefix: RenderTranslationOptions["prefix"],
   state: RenderState,
 ): void {
+  const lastSource = paragraph.nodes.at(-1);
+  const insertionPoint =
+    lastSource?.parentNode === paragraph.container
+      ? lastSource.nextSibling
+      : null;
   const useBlockPrefix =
     prefix === "block" ||
     (prefix === "smart" && isBlockContainer(paragraph.container));
   if (useBlockPrefix) {
     const lineBreak = paragraph.container.ownerDocument.createElement("br");
     lineBreak.dataset.imt = "br";
-    paragraph.container.append(lineBreak);
+    paragraph.container.insertBefore(lineBreak, insertionPoint);
     state.injected.push(lineBreak);
   }
 
-  paragraph.container.append(target);
+  paragraph.container.insertBefore(target, insertionPoint);
   state.injected.push(target);
 }
 
@@ -183,7 +188,9 @@ function newState(paragraph: Paragraph): RenderState {
     sourceTexts: [],
   };
   states.add(state);
-  statesByContainer.set(paragraph.container, state);
+  const byId = statesByContainer.get(paragraph.container) ?? new Map();
+  byId.set(paragraph.id, state);
+  statesByContainer.set(paragraph.container, byId);
   return state;
 }
 
@@ -272,9 +279,19 @@ function clearState(state: RenderState): void {
     }
   }
 
-  state.paragraph.container.removeAttribute("data-imt-id");
+  const container = state.paragraph.container;
   states.delete(state);
-  statesByContainer.delete(state.paragraph.container);
+  const byId = statesByContainer.get(container);
+  byId?.delete(state.paragraph.id);
+  if (container.getAttribute("data-imt-id") === state.paragraph.id) {
+    const remainingId = [...(byId?.values() ?? [])]
+      .flatMap((other) => other.injected)
+      .find((element) => element.getAttribute("data-imt") === "target")
+      ?.getAttribute("data-imt-id");
+    if (remainingId) container.setAttribute("data-imt-id", remainingId);
+    else container.removeAttribute("data-imt-id");
+  }
+  if (byId?.size === 0) statesByContainer.delete(container);
 }
 
 function createTarget(paragraph: Paragraph, dataImt: string): HTMLElement {
@@ -362,10 +379,10 @@ export function setError(
 
 /** Remove the rendered state for one paragraph and restore its source DOM. */
 export function removeTranslation(paragraph: Paragraph): void {
-  const state = statesByContainer.get(paragraph.container);
+  const state = statesByContainer.get(paragraph.container)?.get(paragraph.id);
   if (state) {
     clearState(state);
-  } else {
+  } else if (paragraph.container.getAttribute("data-imt-id") === paragraph.id) {
     paragraph.container.removeAttribute("data-imt-id");
   }
 }
@@ -433,7 +450,10 @@ export function setMode(
 }
 
 /** Toggle learning-mode blur without changing the selected translation theme. */
-export function setMask(root: Document | ShadowRoot | Element, enabled: boolean): void {
+export function setMask(
+  root: Document | ShadowRoot | Element,
+  enabled: boolean,
+): void {
   const element =
     root instanceof Document
       ? root.documentElement
@@ -446,6 +466,12 @@ export function setMask(root: Document | ShadowRoot | Element, enabled: boolean)
 /** Store the paragraph id on its source container. */
 export function markTranslated(container: Element, id: string): void {
   container.setAttribute("data-imt-id", id);
+  const state = statesByContainer.get(container)?.get(id);
+  for (const element of state?.injected ?? []) {
+    if (element.getAttribute("data-imt") === "target") {
+      element.setAttribute("data-imt-id", id);
+    }
+  }
 }
 
 /** Report whether a source container has a translation marker. */

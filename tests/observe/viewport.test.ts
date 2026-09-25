@@ -111,10 +111,7 @@ describe("observeViewport", () => {
     document.body.innerHTML = "<p></p>";
     const container = document.querySelector("p")!;
     const onVisible = vi.fn();
-    const viewport = observeViewport(
-      [{ id: "p1", container }],
-      onVisible,
-    );
+    const viewport = observeViewport([{ id: "p1", container }], onVisible);
 
     FakeIntersectionObserver.instance.intersect(container);
     expect(globalThis.requestIdleCallback).toHaveBeenCalledWith(
@@ -127,5 +124,26 @@ describe("observeViewport", () => {
     FakeIntersectionObserver.instance.intersect(container);
     viewport.disconnect();
     expect(cancelIdleCallback).toHaveBeenCalledWith(7);
+  });
+
+  it("schedules every paragraph when several share a container", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "IntersectionObserver",
+      FakeIntersectionObserver as unknown as typeof IntersectionObserver,
+    );
+    vi.stubGlobal("requestIdleCallback", undefined);
+    document.body.innerHTML = "<p>First line<br>Second line</p>";
+    const container = document.querySelector("p")!;
+    const onVisible = vi.fn();
+    const viewport = observeViewport([], onVisible);
+
+    viewport.add(["first", container]);
+    viewport.add(["second", container]);
+    FakeIntersectionObserver.instance.intersect(container);
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(onVisible).toHaveBeenCalledWith(["first", "second"]);
+    viewport.disconnect();
   });
 });

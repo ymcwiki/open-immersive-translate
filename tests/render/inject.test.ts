@@ -7,6 +7,7 @@ import {
   isTranslated,
   markTranslated,
   removeAll,
+  removeTranslation,
   renderTranslation,
   setError,
   setLoading,
@@ -36,6 +37,49 @@ afterEach(() => {
 });
 
 describe("renderTranslation", () => {
+  it("keeps separate translations for br-separated runs in one paragraph", () => {
+    document.body.innerHTML = "<p>First line<br>Second line</p>";
+    const container = document.querySelector("p")!;
+    const [first, second] = [
+      { id: "first", nodes: [container.childNodes[0]!] },
+      { id: "second", nodes: [container.childNodes[2]!] },
+    ].map(({ id, nodes }) => ({
+      id,
+      container,
+      nodes,
+      text: nodes[0]?.textContent ?? "",
+      placeholders: new Map(),
+    }));
+    const options = {
+      mode: "dual" as const,
+      theme: "none",
+      wrapperTag: "font" as const,
+      prefix: "smart" as const,
+    };
+
+    setLoading(first);
+    setLoading(second);
+    renderTranslation(first, translationFragment("第一行"), options);
+    markTranslated(container, first.id);
+    renderTranslation(second, translationFragment("第二行"), options);
+    markTranslated(container, second.id);
+
+    expect(
+      [...container.querySelectorAll('[data-imt="target"]')].map(
+        (node) => node.textContent,
+      ),
+    ).toEqual(["第一行", "第二行"]);
+    expect(container.textContent).toBe("First line第一行Second line第二行");
+    expect(container.querySelectorAll("[data-imt-id]")).toHaveLength(2);
+    removeTranslation(second);
+    expect(container.getAttribute("data-imt-id")).toBe(first.id);
+    expect(container.querySelector('[data-imt="target"]')?.textContent).toBe(
+      "第一行",
+    );
+    removeAll(document);
+    expect(container.innerHTML).toBe("First line<br>Second line");
+  });
+
   it("inserts a dual translation after a block source", () => {
     document.body.innerHTML = "<p>Hello</p>";
     const container = document.querySelector("p")!;
