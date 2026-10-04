@@ -39,7 +39,7 @@ const github: Rule = {
   ],
 };
 
-/** Twitter/X: tweet text is stable prose; trends, controls, media, and live regions are not. */
+/** Twitter/X: translate tweets and article prose, excluding controls and sidebars. */
 const twitter: Rule = {
   id: "twitter",
   matches: [
@@ -48,7 +48,11 @@ const twitter: Rule = {
     "*://twitter.com/*",
     "*://*.twitter.com/*",
   ],
-  selectors: ["[data-testid='tweetText']"],
+  selectors: [
+    "[data-testid='tweetText']",
+    "[data-testid='twitter-article-title']",
+    "[data-testid='twitterArticleRichTextView']",
+  ],
   excludeSelectors: [
     "[data-testid='sidebarColumn']",
     "[data-testid='trend']",

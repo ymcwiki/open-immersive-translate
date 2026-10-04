@@ -172,6 +172,29 @@ describe("paragraph scanner fixtures", () => {
 
     expect(result).toEqual(["Visible paragraph."]);
   });
+
+  it.each(["false", "FALSE"])(
+    "translates read-only contenteditable=%s",
+    (value) => {
+      expect(
+        texts(
+          `<div contenteditable="${value}"><p>Published article body.</p></div>`,
+        ),
+      ).toEqual(["Published article body."]);
+    },
+  );
+
+  it.each(["", "true", "plaintext-only"])(
+    "skips editable ancestors with value %s even when selecting descendants",
+    (value) => {
+      expect(
+        texts(
+          `<div contenteditable="${value}"><p contenteditable="false">Private draft.</p></div>`,
+          { selectors: ["p"], excludeSelectors: [] },
+        ),
+      ).toEqual([]);
+    },
+  );
 });
 
 describe("paragraph scanner rules", () => {

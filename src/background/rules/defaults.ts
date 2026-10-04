@@ -8,7 +8,7 @@ export const generalRule: Rule = {
   excludeSelectors: [
     ".notranslate",
     "[translate='no']",
-    "[contenteditable]",
+    "[contenteditable]:not([contenteditable='false' i])",
     "nav",
     "[role='navigation']",
   ],

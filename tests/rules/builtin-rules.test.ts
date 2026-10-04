@@ -56,7 +56,11 @@ describe("builtinRules", () => {
 
     expect(byId.github.selectors).toContain("#readme .markdown-body");
     expect(byId.github.excludeSelectors).toContain(".diff-table");
-    expect(byId.twitter.selectors).toEqual(["[data-testid='tweetText']"]);
+    expect(byId.twitter.selectors).toEqual([
+      "[data-testid='tweetText']",
+      "[data-testid='twitter-article-title']",
+      "[data-testid='twitterArticleRichTextView']",
+    ]);
     expect(byId.twitter.excludeSelectors).toContain(
       "[data-testid='sidebarColumn']",
     );

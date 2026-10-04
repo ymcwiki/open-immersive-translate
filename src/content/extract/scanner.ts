@@ -95,7 +95,8 @@ function shouldSkipElement(element: Element, rule: Rule): boolean {
       current.tagName.toUpperCase() === "IFRAME" ||
       hasTag(current, rule.excludeTags ?? []) ||
       matchesAny(current, rule.excludeSelectors ?? []) ||
-      current.hasAttribute("contenteditable") ||
+      (current.hasAttribute("contenteditable") &&
+        current.getAttribute("contenteditable")?.toLowerCase() !== "false") ||
       translate === "no" ||
       current.classList.contains("notranslate") ||
       current.hasAttribute("data-imt")
